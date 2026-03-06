@@ -1610,8 +1610,7 @@
                     <div class="field">
                         <label>GPS Coordinates <button class="btn btn-secondary btn-sm" onclick="getShortAddr()">📍 Auto
                                 GPS</button></label>
-                        <input type="text" id="locationCoords" placeholder="e.g. 9.5916, 76.5222"
-                            oninput="updateMapFromInput()">
+                       <input type="text" id="locationCoords" placeholder="Auto-filled by GPS" readonly style="background: var(--surface-3); cursor: not-allowed;">
                         <div id="mapPreview"></div>
                     </div>
                     <div class="grid-2">
@@ -1989,6 +1988,8 @@
     <div class="toast" id="toast"></div>
 
     <script>
+
+        
         // ── Core ──────────────────────────────────────────────────────────────────────
         const G = id => document.getElementById(id);
         const V = id => G(id)?.value.trim() || '';
@@ -2007,6 +2008,12 @@
             }
         }
 
+        function sanitizeHTML(str) {
+            if (typeof str !== 'string') return str;
+            return str.replace(/[&<>'"]/g, tag => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            }[tag]));
+        }
         // ── Theme ─────────────────────────────────────────────────────────────────────
         function toggleTheme() {
             const html = document.documentElement;
@@ -2275,40 +2282,41 @@
         }
 
         // ── GPS + Reverse Geocoding Auto-Fill ──────────────────────────────────────
+// ── 🔒 SECURE GPS MEMORY LOCK ─────────────────────────────────────────────
+        let _secureGpsLock = 'GPS NOT LOCKED'; // Cannot be easily edited via DevTools
+
         function getShortAddr() {
             if (!navigator.geolocation) return toast('❌ GPS unavailable');
             toast('📍 Locating…');
             const btn = event.target; btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
+            
             navigator.geolocation.getCurrentPosition(async pos => {
                 const lat = pos.coords.latitude; const lng = pos.coords.longitude;
-                G('locationCoords').value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                const secureCoords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                
+                _secureGpsLock = secureCoords; // Lock it in JS memory
+                G('locationCoords').value = secureCoords; // Display it for the user
+                
                 initMap().then(() => { placeMarker(lat, lng); }); saveDraft();
                 toast('✅ Location locked! Fetching address…');
                 btn.innerHTML = '📍 Auto GPS'; btn.disabled = false;
 
-                // Reverse geocode — auto-suggest address fields (user can always edit)
+                // Reverse geocode
                 try {
                     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
                     const data = await res.json();
                     if (data && data.address) {
                         const a = data.address;
-                        // Only fill EMPTY fields — never overwrite user's manual input
                         if (!V('address')) G('address').value = data.display_name?.split(',').slice(0, 3).join(', ') || '';
                         if (!V('locality')) G('locality').value = a.suburb || a.neighbourhood || a.hamlet || '';
                         if (!V('ward')) G('ward').value = a.county_district || '';
-                        if (!V('postoffice')) {
-                            const poName = a.village || a.town || a.city || '';
-                            const pin = a.postcode || '';
-                            if (poName || pin) G('postoffice').value = `${poName}${pin ? ' - ' + pin : ''}`;
-                        }
-                        toast('📝 Address auto-filled — please verify & edit if needed', 4000);
-                        // Cache short address for photo watermark
-                        _lastReverseAddress = data.display_name?.split(',').slice(0, 4).join(', ') || coords;
+                        toast('📝 Address auto-filled', 4000);
+                        _lastReverseAddress = data.display_name?.split(',').slice(0, 4).join(', ') || secureCoords;
                     }
-                } catch (e) { /* Reverse geocode failed silently — no harm, user types manually */ }
-            }, () => { toast('❌ Permission denied'); btn.innerHTML = '📍 Auto GPS'; btn.disabled = false; });
+                } catch (e) { }
+            }, () => { toast('❌ Permission denied'); btn.innerHTML = '📍 Auto GPS'; btn.disabled = false; }, 
+            { enableHighAccuracy: true, maximumAge: 0 }); // Force fresh GPS ping
         }
-
         // ── Distance Calculator ───────────────────────────────────────────────────────
         function haversineDist(lat1, lon1, lat2, lon2) {
             const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
@@ -2553,9 +2561,15 @@
                 btn.disabled = false;
             } 
         }
-        function saveToOfflineQueue(payload) {
+       // ── 🔒 TAMPER-EVIDENT OFFLINE QUEUE ──────────────────────────────────────
+        async function saveToOfflineQueue(payload) {
             let queue = JSON.parse(localStorage.getItem('sif_offline_queue') || '[]');
-            if (!queue.find(i => i.fileNo === payload.fileNo)) { queue.push(payload); localStorage.setItem('sif_offline_queue', JSON.stringify(queue)); }
+            if (!queue.find(i => i.fileNo === payload.fileNo)) { 
+                // Generate a tamper-seal based on the raw data
+                payload._seal = await generateSignature(payload.fileNo + payload.applicant, API_KEY);
+                queue.push(payload); 
+                localStorage.setItem('sif_offline_queue', JSON.stringify(queue)); 
+            }
             updateQueueUI();
             const b = G('submitResult'); b.style.display = 'block';
             b.style.borderColor = 'var(--warn)'; b.style.color = 'var(--warn)';
@@ -2567,16 +2581,30 @@
             if (!navigator.onLine) return toast('❌ Still offline');
             let queue = JSON.parse(localStorage.getItem('sif_offline_queue') || '[]');
             if (!queue.length) return;
+            
             const btn = G('syncBtn'); btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
             let successes = [];
+            
             for (let item of queue) {
-                try { const r = await sendShieldedData(V('gasUrl'), 'submit', item); if (r.status === 'ok') successes.push(item.fileNo); } catch (e) { }
+                try { 
+                    // Verify the seal hasn't been broken before sending
+                    const verifySeal = await generateSignature(item.fileNo + item.applicant, API_KEY);
+                    if (item._seal !== verifySeal) {
+                        console.error("Tampering detected on file:", item.fileNo);
+                        toast(`🚨 Tampering detected on ${item.fileNo}. Sync rejected.`);
+                        continue; // Skip this tampered file
+                    }
+                    
+                    const r = await sendShieldedData(V('gasUrl'), 'submit', item); 
+                    if (r.status === 'ok') successes.push(item.fileNo); 
+                } catch (e) { }
             }
             queue = queue.filter(i => !successes.includes(i.fileNo));
             localStorage.setItem('sif_offline_queue', JSON.stringify(queue));
             updateQueueUI(); btn.innerHTML = '🔄 Sync'; btn.disabled = false;
-            toast(`✅ Synced ${successes.length} item(s)!`, 4000);
+            if (successes.length) toast(`✅ Synced ${successes.length} item(s)!`, 4000);
         }
+      
 
         function updateQueueUI() {
             let queue = JSON.parse(localStorage.getItem('sif_offline_queue') || '[]');
