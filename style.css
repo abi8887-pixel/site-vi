@@ -1,0 +1,24 @@
+/* ── GMAIL-STYLE INBOX ──────────────────────────────────────────────────── */
+        #inboxView { display: none; flex-direction: column; height: 100vh; background: var(--bg); overflow-y: auto; padding-bottom: 80px; }
+        .inbox-header { padding: 16px 20px; background: var(--surface); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .inbox-header h2 { font-size: 1.2rem; display: flex; align-items: center; gap: 8px; color: var(--text); }
+        .refresh-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--primary); padding: 8px; border-radius: 50%; }
+        .refresh-btn:active { background: rgba(0,0,0,0.1); }
+        
+        .mail-item { display: flex; gap: 15px; padding: 16px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.2s; }
+        .mail-item:active { background: rgba(0,0,0,0.05); }
+        
+        /* The colorful circle avatar */
+        .mail-avatar { width: 45px; height: 45px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: bold; flex-shrink: 0; }
+        
+        .mail-content { flex: 1; overflow: hidden; }
+        .mail-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+        .mail-sender { font-weight: bold; font-size: 1.05rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-status { font-size: 0.75rem; font-weight: 600; color: #f59e0b; background: rgba(245, 158, 11, 0.1); padding: 2px 6px; border-radius: 4px; }
+        
+        .mail-subject { font-size: 0.95rem; color: var(--text); font-weight: 500; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-snippet { font-size: 0.85rem; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* The floating Compose button */
+        .fab-compose { position: fixed; bottom: 20px; right: 20px; background: var(--surface); color: var(--primary); border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.15); padding: 16px; border-radius: 16px; display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1rem; cursor: pointer; z-index: 100; transition: transform 0.2s; }
+        .fab-compose:active { transform: scale(0.95); }
