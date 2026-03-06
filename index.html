@@ -1442,7 +1442,23 @@
 
     <div class="wrapper">
         <div class="card">
+<div id="inboxView" style="display: flex;">
+        <div class="inbox-header">
+            <h2><span style="font-size:1.5rem">☰</span> Inbox</h2>
+            <button class="refresh-btn" onclick="fetchInbox()">🔄</button>
+        </div>
+        
+        <div id="mailList">
+            <div style="padding: 30px; text-align: center; color: var(--text-2);">
+                <span class="spinner" style="border-color: var(--primary); border-top-color: transparent; border-width: 3px; width: 30px; height: 30px; display: inline-block;"></span>
+                <p style="margin-top: 10px;">Fetching secure dispatches...</p>
+            </div>
+        </div>
 
+        <button class="fab-compose" onclick="startNewBlankReport()">
+            <span style="font-size: 1.2rem;">✏️</span> Compose
+        </button>
+    </div>
             <header>
                 <div class="header-left">
                     <div class="logo-mark">
@@ -3212,6 +3228,104 @@
 
         // ── Boot: load photos from IndexedDB then build nav ───────────────────────
         loadPhotosFromDB().then(() => { buildNav(); renderGallery(); lockDateInputs(); });
+
+        // ── 📥 INBOX ENGINE ──────────────────────────────────────────────────────
+        
+        // Let's assume this agent is assigned "AGT-01". You can make this dynamic later!
+        const CURRENT_AGENT_ID = 'AGT-01'; 
+        let currentAssignedCaseId = null;
+
+        async function fetchInbox() {
+            const url = V('gasUrl');
+            if (!url) return;
+            
+            const mailList = G('mailList');
+            mailList.innerHTML = '<div style="padding: 30px; text-align: center; color: var(--text-2);">Syncing secure tunnel...</div>';
+
+            try {
+                // Securely ask the server for AGT-01's cases
+                const response = await sendShieldedData(url, 'fetch_cases', { agentId: CURRENT_AGENT_ID });
+                
+                if (response.status === 'ok' && response.cases.length > 0) {
+                    mailList.innerHTML = ''; // Clear loading text
+                    
+                    response.cases.forEach(c => {
+                        const bankName = c['Bank'] || 'Unknown Bank';
+                        const firstLetter = bankName.charAt(0).toUpperCase();
+                        
+                        // Pick a color based on the letter so it looks exactly like Gmail!
+                        const colors = ['#ea4335', '#34a853', '#fbbc05', '#4285f4', '#8e24aa', '#e67c73'];
+                        const bgColor = colors[firstLetter.charCodeAt(0) % colors.length];
+
+                        const mailHTML = `
+                            <div class="mail-item" onclick='openAssignedCase(${JSON.stringify(c).replace(/'/g, "&#39;")})'>
+                                <div class="mail-avatar" style="background: ${bgColor};">${firstLetter}</div>
+                                <div class="mail-content">
+                                    <div class="mail-top">
+                                        <div class="mail-sender">${bankName}</div>
+                                        <div class="mail-status">${c['Status'] || 'New'}</div>
+                                    </div>
+                                    <div class="mail-subject">${c['Applicant']} — ${c['Taluk']}</div>
+                                    <div class="mail-snippet">📞 ${c['Phone'] || 'No phone'} · ${c['Notes'] ? 'Manager: ' + c['Notes'] : 'Standard Valuation'}</div>
+                                </div>
+                            </div>
+                        `;
+                        mailList.insertAdjacentHTML('beforeend', mailHTML);
+                    });
+                } else {
+                    mailList.innerHTML = `
+                        <div style="padding: 40px 20px; text-align: center; color: var(--text-2);">
+                            <div style="font-size: 3rem; margin-bottom: 10px;">🎉</div>
+                            <h3>You're all caught up!</h3>
+                            <p style="font-size: 0.85rem; margin-top: 5px;">No pending files assigned to you.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                mailList.innerHTML = '<div style="padding: 30px; text-align: center; color: #ef4444;">📡 Secure connection failed. Are you offline?</div>';
+            }
+        }
+
+        function openAssignedCase(caseData) {
+            // Hide Inbox, Show Form
+            G('inboxView').style.display = 'none';
+            G('appContainer').style.display = 'block';
+            
+            // Pre-fill the form so the agent doesn't have to type it!
+            currentAssignedCaseId = caseData['Case ID'];
+            G('bankName').value = caseData['Bank'] || '';
+            G('applicantName').value = caseData['Applicant'] || '';
+            G('applicantPhone').value = caseData['Phone'] || '';
+            G('taluk').value = caseData['Taluk'] || '';
+            
+            // Update status on the server to 'In Progress'
+            updateCaseStatusOnServer(currentAssignedCaseId, 'In Progress', 'Agent started inspection');
+            
+            toast('Case loaded securely.');
+        }
+
+        function startNewBlankReport() {
+            // For walk-ins or unassigned cases
+            currentAssignedCaseId = null; 
+            G('inboxView').style.display = 'none';
+            G('appContainer').style.display = 'block';
+            resetApp(); // Clear any old data
+        }
+
+        async function updateCaseStatusOnServer(caseId, status, note) {
+            const url = V('gasUrl');
+            if (navigator.onLine && url) {
+                // Send secure update silently in the background
+                sendShieldedData(url, 'update_status', { caseId: caseId, newStatus: status, note: note });
+            }
+        }
+
+        // Auto-fetch inbox when the app loads
+        window.addEventListener('load', () => {
+            if(G('inboxView').style.display !== 'none') {
+                fetchInbox();
+            }
+        });
     </script>
 </body>
 
