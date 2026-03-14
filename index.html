@@ -2725,9 +2725,9 @@
         }
 
         // ── FIX 3: VERIFIED WATERMARK CAPTURE (With robust fallback) ──────────────
-        let _retakeTargetId = null;
+        /let _retakeTargetId = null;
 
-        async function handleCapture(input, retakeId = null) {
+       /*- async function handleCapture(input, retakeId = null) {
             if (!input.files?.[0]) return;
             const file = input.files[0];
             const label = G('photoLabel').value;
@@ -2806,8 +2806,154 @@
         async function handleRetake(input) {
             if (!_retakeTargetId) return;
             await handleCapture(input, _retakeTargetId);
-        }
+        }                */
 
+            // ═══════════════════════════════════════════════════════════════════════════════
+// UPGRADED PROFESSIONAL PHOTO ENGINE (Canvas Watermarking)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function handleCapture(input, retakeId = null) {
+    if (!input.files?.[0]) return;
+    const file = input.files[0];
+    const label = G('photoLabel').value;
+    
+    // Parse GPS Coords properly
+    const coordsStr = V('locationCoords') || 'GPS NOT LOCKED';
+    let latLonStr = coordsStr;
+    if(coordsStr !== 'GPS NOT LOCKED' && coordsStr.includes(',')){
+        const pts = coordsStr.split(',').map(p => p.trim());
+        latLonStr = `Lat ${pts[0]}° / Lon ${pts[1]}°`;
+    }
+
+    // Get timestamp with GMT offset (India standard, matching your examples)
+    const rawDate = new Date();
+    const timestamp = rawDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
+    
+    // Intelligently split the address (assuming lastReverseAddress is comma-separated)
+    const shortAddr = lastReverseAddress || V('address').split('\n')[0] || V('locality') || coordsStr;
+    const addrLines = shortAddr.split(', ').slice(0, 3); // Grab top 3 parts (Village, District, PIN)
+
+    toast('✍️ Stamping professional verification…');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set Standard Professional Output Res (Standard 4:3 ratio matching standard phone cameras)
+            const targetW = 1200; 
+            const scale = targetW / img.width;
+            canvas.width = targetW;
+            canvas.height = img.height * scale;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            // --- REDESIGN: Transparent Professional Overlay ---
+            // Stop using solid bars. Place structured text directly on image.
+            
+            // Layout Settings (Matching target example structure)
+            const marginLeft = 40; // Indent from left
+            const marginBottom = 40; // Indent from bottom
+            const yBase = canvas.height - marginBottom;
+            
+            // Font Definitions (Ensure Sora/DM Mono from head are used)
+            const soraMain = 'bold 30px Sora, sans-serif';       // DateTime prominent
+            const dmMonoSub = '500 18px "DM Mono", monospace'; // Lat/Lon specific
+            const soraAddr = '500 18px Sora, sans-serif';       // Address structured
+
+            // Set Text Shadow for high contrast on any photo background
+            ctx.shadowColor = 'rgba(0,0,0,0.85)'; // Dark soft shadow
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.fillStyle = '#ffffff'; // White professional text
+            ctx.textAlign = 'left';
+
+            // We build the layout from the bottom up.
+            const lineHeight = 34; // spacing between lines
+            let yCursor = yBase;
+
+            // Lines 3-5: ADDRESS (STRUCTURED)
+            ctx.font = soraAddr;
+            for(let j=Math.min(3, addrLines.length)-1; j>=0; j--){
+                ctx.fillText(addrLines[j].trim(), marginLeft, yCursor);
+                yCursor -= lineHeight;
+            }
+            yCursor -= 10; // Extra gap before location
+
+            // Line 2: COMPASS + LAT / LON
+            ctx.font = dmMonoSub;
+            drawCompassIcon(ctx, marginLeft + 15, yCursor - 10, 32); // Icon centered vertically
+            ctx.fillText(latLonStr, marginLeft + 50, yCursor); // Text following icon
+            yCursor -= (lineHeight + 30); // Gap before DateTime prominence
+
+            // Line 1: DATE / TIME (PROMINTENT LIKE EXAMPLE)
+            ctx.font = soraMain;
+            // Replicate GMT+5:30 suffix common in inspection apps
+            ctx.fillText(timestamp.toUpperCase() + ' (GMT+5:30)', marginLeft, yCursor);
+
+            // Subtle branded footer (bottom right, subtle gray)
+            ctx.font = '500 20px Sora, sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.7)'; // 70% opacity white
+            ctx.textAlign = 'right';
+            ctx.shadowBlur = 4; // Lighter shadow
+            ctx.fillText(`SIF Modular App | ${label.toUpperCase()}`, canvas.width - 40, canvas.height - 20);
+
+            // Finalizing image
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+            const photo = {
+                id: retakeId || Date.now(),
+                data: dataUrl,
+                label,
+                coords,
+                address: shortAddr,
+                timestamp,
+                hasGps: coords !== 'GPS NOT LOCKED'
+            };
+
+            await savePhotoToDB(photo);
+            window.sitePhotos = await loadPhotosFromDB();
+            renderGallery();
+            input.value = '';
+            toast('✅ Professional Photo Saved');
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+// Helper to draw a static professional compass icon using Canvas pathing
+function drawCompassIcon(ctx, x, y, size) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.beginPath();
+    
+    // Outer Circle (White outline)
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#ffffff';
+    ctx.arc(0, 0, size/2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Red North Needle
+    ctx.beginPath();
+    ctx.fillStyle = '#ea4335'; // Red North indicator
+    ctx.moveTo(0, -(size/2) + 2); // Tip
+    ctx.lineTo(-size/6, -1); // Bottom left
+    ctx.lineTo(size/6, -1); // Bottom right
+    ctx.closePath();
+    ctx.fill();
+
+    // White South Needle
+    ctx.beginPath();
+    ctx.fillStyle = '#ffffff';
+    ctx.moveTo(0, (size/2) - 2); // Tip
+    ctx.lineTo(-size/6, 1); // Top left
+    ctx.lineTo(size/6, 1); // Top right
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+}
         // ── GALLERY RENDER ────────────────────────────────────────────────────────
         function renderGallery() {
             const container = G('photoGallery');
