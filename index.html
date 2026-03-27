@@ -1,2081 +1,410 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SIF · Site Inspection Field App</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&family=Sora:wght@600;700&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-     <link rel="stylesheet" href="style.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SIF · Enterprise Valuation</title>
     
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/style.css" />
 </head>
-
 <body>
 
-    <div class="wrapper">
-        <div class="card">
-<div id="inboxView" style="display: flex;">
-        <div class="inbox-header">
-            <h2><span style="font-size:1.5rem">☰</span> Inbox</h2>
-            <button class="refresh-btn" onclick="fetchInbox()">🔄</button>
+    <!-- ═══ LOGIN OVERLAY ═══ -->
+    <div id="loginOverlay" class="login-overlay active">
+        <div class="login-card">
+            <div class="logo-mark" style="margin: 0 auto 15px; width: 48px; height: 48px;">
+                <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            </div>
+            <h2 style="font-family:'Sora', sans-serif; margin-bottom: 5px; color: var(--text);">Agent Login</h2>
+            <p style="font-size: 0.8rem; color: var(--text-2); margin-bottom: 20px;">SIF Enterprise Platform</p>
+            
+            <div class="field">
+                <label>Agent ID</label>
+                <input type="text" id="loginId" placeholder="AGT-01" style="text-transform: uppercase;">
+            </div>
+            <div class="field">
+                <label>Password</label>
+                <input type="password" id="loginPass" placeholder="••••••••">
+            </div>
+            <div class="field">
+                <label>Backend API URL</label>
+                <input type="url" id="loginUrl" placeholder="https://script.google.com/.../exec">
+            </div>
+            
+            <button class="btn btn-primary" id="btnLogin" onclick="if(typeof handleLogin==='function') handleLogin()" style="width: 100%; padding: 12px; margin-top: 10px;">Secure Login</button>
         </div>
-        
-        <div id="mailList">
-            <div style="padding: 30px; text-align: center; color: var(--text-2);">
-                <span class="spinner" style="border-color: var(--primary); border-top-color: transparent; border-width: 3px; width: 30px; height: 30px; display: inline-block;"></span>
-                <p style="margin-top: 10px;">Fetching secure dispatches...</p>
+    </div>
+
+    <!-- ═══ HEADER ═══ -->
+    <header>
+        <div class="header-left">
+            <div class="logo-mark"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
+            <div>
+                <div class="app-title">SIF MODULAR</div>
+                <div class="app-subtitle">Field Inspection Pro</div>
             </div>
         </div>
+        <div class="header-right">
+            <button class="icon-btn" onclick="openDashboard()" title="History">🗂</button>
+            <button class="icon-btn" onclick="if(typeof fetchInbox==='function') fetchInbox(); G('inboxView').style.display='flex'; G('appContainer').style.display='none';" title="Inbox">📥</button>
+            <button class="icon-btn" onclick="if(typeof logoutAgent==='function') logoutAgent()" title="Logout" style="color:var(--danger);">🚪</button>
+        </div>
+    </header>
 
-        <button class="fab-compose" onclick="startNewBlankReport()">
-            <span style="font-size: 1.2rem;">✏️</span> Compose
-        </button>
+    <!-- ═══ INBOX VIEW ═══ -->
+    <div id="inboxView" style="display: none; flex-direction: column; padding-bottom: 80px;">
+        <div class="inbox-header">
+            <h2 style="margin:0; font-size: 1.2rem;">📥 Assigned Cases</h2>
+            <div>
+                <button class="btn btn-primary btn-sm" onclick="if(typeof startNewBlankReport==='function') startNewBlankReport()">+ Walk-in Report</button>
+                <button class="refresh-btn" onclick="if(typeof fetchInbox==='function') fetchInbox()">🔄</button>
+            </div>
+        </div>
+        <div id="mailList"></div>
     </div>
-            <header>
-                <div class="header-left">
-                    <div class="logo-mark">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                            <polyline points="9 22 9 12 15 12 15 22" />
-                        </svg>
-                    </div>
-                    <div>
-                        <div class="app-title">Site Inspection</div>
-                        <div class="app-subtitle">Secure Field App v3.2</div>
-                    </div>
-                </div>
-                <div class="header-right">
-                    <span class="status-chip" id="headerDate" onclick="toast('Draft is auto-saving 💾')">Draft
-                        Active</span>
-                    <button id="dashBtn" class="icon-btn" onclick="openDashboard()" title="View History">📊</button>
-                    <button id="themeToggleBtn" class="icon-btn" onclick="toggleTheme()"
-                        title="Toggle Theme">☀️</button>
-                    <button class="icon-btn danger" onclick="resetApp()" title="Reset Form">🗑️</button>
-                </div>
-            </header>
 
-            <nav class="steps-nav" id="stepsNav"></nav>
-
+    <!-- ═══ MAIN APP CONTAINER ═══ -->
+    <div class="wrapper" id="appContainer" style="display:none;">
+        <div class="card">
+            <div class="steps-nav" id="stepsNav"></div>
             <div class="form-body">
 
+                <!-- ═══ STEP 0: BANK & LOAN ═══ -->
                 <div class="section active" id="s0">
-                    <div class="section-head">
-                        <h2><span></span>Bank &amp; Loan Details</h2>
-                    </div>
+                    <div class="section-head"><h2><span></span>Bank & Loan</h2></div>
                     <div class="field">
                         <label>Bank Name</label>
-                        <select id="bankName"
-                            onchange="G('otherBankDiv').style.display=this.value==='Other'?'block':'none'">
-                            <option value="">— Select Bank —</option>
-                            <option>ICICI Bank</option>
-                            <option>Axis Bank</option>
-                            <option>South Indian Bank</option>
-                            <option>Yes Bank</option>
-                            <option>DCB Bank</option>
-                            <option>Kotak Mahindra Bank</option>
-                            <option>Karur Vysya Bank</option>
-                            <option>ESAF Small Finance Bank</option>
-                            <option>Ujjivan Small Finance Bank</option>
-                            <option>HDFC Credila</option>
-                            <option>Cholamandalam Finance</option>
-                            <option>Muthoot Homefin</option>
-                            <option>Manappuram Homefin</option>
-                            <option>Mahindra Homefinance</option>
-                            <option>Sundaram Homefin</option>
-                            <option>Aadhaar Housing Finance</option>
-                            <option>Aditya Birla Capital</option>
-                            <option>Encore ARC</option>
-                            <option>Other</option>
-                        </select>
+                        <select id="bankName"></select>
                     </div>
-                    <div class="field" id="otherBankDiv" style="display:none;"><input type="text" id="otherBank"
-                            placeholder="Specify Bank Name"></div>
                     <div class="field">
                         <label>Loan Type</label>
-                        <select id="loanType">
-                            <option value="">— Select Loan —</option>
-                            <option>H L</option>
-                            <option>Loan Against Property</option>
-                            <option>Revaluation</option>
-                            <option>Under Construction</option>
-                            <option>Under Possession</option>
-                            <option>Education Loan</option>
-                            <option>HL TopUp</option>
-                            <option>Part Disbursement</option>
-                            <option>Other</option>
+                        <div id="loanTypeContainer" class="selection-group"></div>
+                        <input type="hidden" id="loanType">
+                    </div>
+                </div>
+
+                <!-- ═══ STEP 1: PEOPLE ═══ -->
+                <div class="section" id="s1">
+                    <div class="section-head"><h2><span></span>People Involved</h2></div>
+                    <div class="field"><label>Applicant Name</label><input type="text" id="applicantName" placeholder="Full name"></div>
+                    <div class="field"><label>Owner Name</label><input type="text" id="ownerName" placeholder="Property owner"></div>
+                    <div class="field">
+                        <label>Occupied By</label>
+                        <div id="occupancyContainer" class="selection-group"></div>
+                        <input type="hidden" id="occupiedBy">
+                    </div>
+                    <div class="field"><label>Site Shown By</label><input type="text" id="siteShownBy" placeholder="Person who showed the site"></div>
+                    <div class="field"><label>Phone Number</label><input type="tel" id="phoneNumber" placeholder="Mobile number"></div>
+                </div>
+
+                <!-- ═══ STEP 2: PROPERTY ADDRESS ═══ -->
+                <div class="section" id="s2">
+                    <div class="section-head"><h2><span></span>Property Address</h2></div>
+                    <div class="field"><label>Property Address</label><textarea id="address" rows="3" placeholder="Full property address"></textarea></div>
+                </div>
+
+                <!-- ═══ STEP 3: LOCATION & GPS ═══ -->
+                <div class="section" id="s3">
+                    <div class="section-head"><h2><span></span>Location & GPS</h2></div>
+                    <div class="field"><label>District</label><input type="text" id="district" value="Kottayam" readonly></div>
+                    <div class="field"><label>Taluk</label><select id="taluk"></select></div>
+
+                    <div class="field ac-wrap">
+                        <label>Village</label>
+                        <input type="text" id="villageInput" placeholder="Type to search..." oninput="globalVillageSearch(this.value)" onfocus="globalVillageSearch(this.value)">
+                        <div class="ac-dd" id="acVillage"></div>
+                    </div>
+
+                    <div class="field ac-wrap">
+                        <label>Panchayat <small id="panchayatHint" style="color:var(--text-3);"></small></label>
+                        <input type="text" id="panchayatInput" placeholder="Type to search..." oninput="acShow('panchayat', this.value); toggleLocalBody('panchayat');" onfocus="acShow('panchayat', this.value)">
+                        <div class="ac-dd" id="acPanchayat"></div>
+                    </div>
+
+                    <div class="field ac-wrap">
+                        <label>Municipality <small id="municipalityHint" style="color:var(--text-3);"></small></label>
+                        <input type="text" id="municipalityInput" placeholder="Type to search..." oninput="acShow('municipality', this.value); toggleLocalBody('municipality');" onfocus="acShow('municipality', this.value)">
+                        <div class="ac-dd" id="acMunicipality"></div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field"><label>Locality</label><input type="text" id="locality" placeholder="Area / Locality"></div>
+                        <div class="field"><label>Ward</label><input type="text" id="ward" placeholder="Ward No / Name"></div>
+                    </div>
+                    <div class="field"><label>Door No</label><input type="text" id="doorNo" placeholder="Door / House number"></div>
+
+                    <div class="field">
+                        <label>GPS Coordinates <button class="btn btn-secondary btn-sm" onclick="getShortAddr()">📍 Auto GPS</button></label>
+                        <input type="text" id="locationCoords" value="GPS NOT LOCKED" readonly>
+                    </div>
+                    <div id="mapPreview" style="height: 250px; margin-top: 10px; border-radius: var(--radius-sm); display:none;"></div>
+                </div>
+
+                <!-- ═══ STEP 4: DISTANCES & LANDMARKS ═══ -->
+                <div class="section" id="s4">
+                    <div class="section-head">
+                        <h2><span></span>Distances & Landmarks</h2>
+                        <button class="btn btn-primary btn-sm" id="btnCalcDist" onclick="autoCalcDistances()">📡 Auto-Fill</button>
+                    </div>
+                    <div class="field"><label>Nearest Landmark</label><input type="text" id="nearLandmark" placeholder="Nearby landmark"></div>
+                    <div class="field"><label>Nearest Branch</label><input type="text" id="nearBranch" placeholder="Nearest bank branch"></div>
+                    <div class="field"><label>Distance from Office</label><input type="text" id="distFromOffice" placeholder="e.g. 12 km"></div>
+                    <div class="grid-2">
+                        <div class="field"><label>Nearest Police Station</label><input type="text" id="nearPolice"></div>
+                        <div class="field"><label>Nearest Railway Station</label><input type="text" id="nearRailway"></div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="field"><label>Nearest Bus Stop</label><input type="text" id="nearBus"></div>
+                        <div class="field"><label>Nearest Town</label><input type="text" id="nearTown"></div>
+                    </div>
+                    <div class="field"><label>Nearest Hospital</label><input type="text" id="nearHospital"></div>
+                    <div class="field">
+                        <label>Nearby Land Usage</label>
+                        <div id="landUsageContainer" class="selection-group"></div>
+                        <input type="hidden" id="nearbyLandUsage">
+                    </div>
+                </div>
+
+                <!-- ═══ STEP 5: ACCESS & ROAD ═══ -->
+                <div class="section" id="s5">
+                    <div class="section-head"><h2><span></span>Access & Road</h2></div>
+                    <div class="field"><label>Access to Site</label><input type="text" id="accessToSite" placeholder="e.g. Tar road, 2 km from NH"></div>
+                    <div class="field"><label>Distance from Panchayat/PWD Road</label><input type="text" id="distFromRoad" placeholder="e.g. 200 m"></div>
+                    <div class="field">
+                        <label>Condition of Road</label>
+                        <select id="conditionOfRoad">
+                            <option value="Good">Good</option>
+                            <option value="Average">Average</option>
+                            <option value="Poor">Poor</option>
                         </select>
                     </div>
                 </div>
 
-                <div class="section" id="s1">
-                    <div class="section-head">
-                        <h2><span></span>People Involved</h2>
-                    </div>
-                    <div class="field"><label>Applicant Name</label><input type="text" id="applicantName"></div>
-                    <div class="field"><label>Owner Name</label><input type="text" id="ownerName"></div>
-                    <div class="grid-2">
-                        <div class="field">
-                            <label>Occupied By</label>
-                            <select id="occupiedBy">
-                                <option>Owner</option>
-                                <option>Tenant</option>
-                                <option>Vacant</option>
-                                <option>Under Construction</option>
-                                <option>Under Possession</option>
-                                <option>Other</option>
-                            </select>
-                        </div>
-                        <div class="field"><label>Phone Number</label><input type="tel" id="phoneNumber" maxlength="13"
-                                pattern="[0-9*+\-]*" inputmode="tel" placeholder="+91 or 10 digits"
-                                oninput="this.value = this.value.replace(/[^0-9*+\-]/g, ''); this.maxLength = this.value.startsWith('+') ? 13 : 10;">
-                        </div>
-                    </div>
-                    <div class="field"><label>Site Shown By</label><input type="text" id="siteShownBy"
-                            placeholder="Name & Relation"></div>
-                </div>
-
-                <div class="section" id="s2">
-                    <div class="section-head">
-                        <h2><span></span>Property Address</h2>
-                    </div>
-                    <div class="field"><label>Property Address</label><textarea id="address" rows="2"
-                            placeholder="House/Flat/Shop/Survey No."></textarea></div>
-                    <div class="field" style="z-index: 10;">
-                        <label>Post Office &amp; PIN</label>
-                        <div class="ac-wrap">
-                            <input type="text" id="postoffice" placeholder="Type PIN or name…" autocomplete="off"
-                                oninput="searchPO(this.value)">
-                            <div class="ac-dd" id="acPostoffice"></div>
-                        </div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Locality</label><input type="text" id="locality"></div>
-                        <div class="field"><label>Door No.</label><input type="text" id="doorNo"></div>
-                    </div>
-                    <div class="field"><label>Ward</label><input type="text" id="ward"></div>
-                </div>
-
-                <div class="section" id="s3">
-                    <div class="section-head">
-                        <h2><span></span>Local Body &amp; Location</h2>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field">
-                            <label>Taluk</label>
-                            <select id="taluk"
-                                onchange="G('villageInput').value=''; G('panchayatInput').value=''; G('municipalityInput').value='';">
-                                <option value="">— Select —</option>
-                                <option>Changanassery</option>
-                                <option>Kanjirappally</option>
-                                <option>Kottayam</option>
-                                <option>Meenachil</option>
-                                <option>Vaikom</option>
-                            </select>
-                        </div>
-                        <div class="field" style="z-index:9;"><label>Village</label>
-                            <div class="ac-wrap"><input type="text" id="villageInput" autocomplete="off"
-                                    oninput="acShow('village', this.value)">
-                                <div class="ac-dd" id="acVillage"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field" style="z-index:8;"><label>Panchayat <span id="panchayatHint"
-                                    style="font-size:0.58rem; color:var(--text-3); font-weight:400; text-transform:none;"></span></label>
-                            <div class="ac-wrap"><input type="text" id="panchayatInput" autocomplete="off"
-                                    oninput="acShow('panchayat', this.value); toggleLocalBody('panchayat')">
-                                <div class="ac-dd" id="acPanchayat"></div>
-                            </div>
-                        </div>
-                        <div class="field" style="z-index:7;"><label>Municipality <span id="municipalityHint"
-                                    style="font-size:0.58rem; color:var(--text-3); font-weight:400; text-transform:none;"></span></label>
-                            <div class="ac-wrap"><input type="text" id="municipalityInput" autocomplete="off"
-                                    oninput="acShow('municipality', this.value); toggleLocalBody('municipality')">
-                                <div class="ac-dd" id="acMunicipality"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label>GPS Coordinates <button class="btn btn-secondary btn-sm" onclick="getShortAddr()">📍 Auto
-                                GPS</button></label>
-                       <input type="text" id="locationCoords" placeholder="Auto-filled by GPS" readonly style="background: var(--surface-3); cursor: not-allowed;">
-                        <div id="mapPreview"></div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Land Usage</label><select id="landUsage">
-                                <option>Residential</option>
-                                <option>Agricultural</option>
-                                <option>Commercial</option>
-                                <option>Mixed</option>
-                            </select></div>
-                        <div class="field"><label>Road Condition</label><select id="roadCondition">
-                                <option>Good</option>
-                                <option>Average</option>
-                                <option>Poor</option>
-                                <option>Under Construction</option>
-                            </select></div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Access to Site</label><input type="text" id="siteAccess"
-                                placeholder="e.g. Tar road"></div>
-                        <div class="field"><label>Distance to PWD Rd.</label><input type="text" id="distPwd"></div>
-                    </div>
-                </div>
-
-                <div class="section" id="s4">
-                    <div class="section-head">
-                        <h2><span></span>Nearby Distances</h2>
-                        <button class="btn btn-primary btn-sm" onclick="autoCalcDistances()" id="btnCalcDist">📡
-                            Auto-Fill</button>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Nearest Landmark</label><input type="text" id="nearLandmark"></div>
-                        <div class="field"><label>Nearest Branch</label><input type="text" id="nearBranch"></div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Dist. from Office</label><input type="text" id="distOffice"
-                                placeholder="Auto-calculated (km)"></div>
-                        <div class="field"><label>Nearest Town</label><input type="text" id="nearTown"></div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Nearest Police Stn.</label><input type="text" id="nearPolice"></div>
-                        <div class="field"><label>Nearest Hospital</label><input type="text" id="nearHospital"></div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Nearest Railway Stn.</label><input type="text" id="nearRailway"></div>
-                        <div class="field"><label>Nearest Bus Stop</label><input type="text" id="nearBus"></div>
-                    </div>
-                </div>
-
-                <div class="section" id="s5">
-                    <div class="section-head">
-                        <h2><span></span>Boundaries</h2>
-                    </div>
-
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <p
-                            style="font-size:0.72rem; color:var(--text-2); text-transform:uppercase; letter-spacing:0.06em;">
-                            As per Land Sketch (LS)</p>
-                    </div>
-                    <table class="dir-table" id="lsBoundariesContainer"></table>
-
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <p
-                            style="font-size:0.72rem; color:var(--text-2); text-transform:uppercase; letter-spacing:0.06em;">
-                            As per Actual Site</p>
-                        <button class="btn btn-secondary btn-sm" onclick="copyBounds('ls','act')"
-                            title="Copy LS boundaries here">⬆ Same as LS</button>
-                    </div>
-                    <table class="dir-table" id="actBoundariesContainer"></table>
-
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <p
-                            style="font-size:0.72rem; color:var(--text-2); text-transform:uppercase; letter-spacing:0.06em;">
-                            Demarcation</p>
-                        <div style="display:flex; gap:6px;">
-                            <button class="btn btn-secondary btn-sm" onclick="copyBounds('ls','dem')"
-                                title="Copy LS to Demarcation">⬆ Same as LS</button>
-                            <button class="btn btn-secondary btn-sm" onclick="copyBounds('act','dem')"
-                                title="Copy Actual to Demarcation">⬆ Same as Actual</button>
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label>Description <button class="btn-mic" onclick="startVoice('demarcationDesc')">🎙
-                                Speak</button></label>
-                        <input type="text" id="demarcationDesc" value="compound walls on all sides">
-                    </div>
-                    <table class="dir-table" id="demBoundariesContainer"></table>
-                </div>
-
+                <!-- ═══ STEP 6: BOUNDARIES ═══ -->
                 <div class="section" id="s6">
-                    <div class="section-head">
-                        <h2><span></span>Building &amp; Land Details</h2>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Age of Building (yrs)</label><input id="age" type="number"></div>
-                        <div class="field"><label>Area of Building</label><input id="area"></div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Number of Floors</label><input id="floors"></div>
-                        <div class="field"><label>Water Source</label><input id="waterSource"></div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Roofing</label><input id="roofing"></div>
-                        <div class="field"><label>Flooring</label><input id="flooring"></div>
-                    </div>
-                    <hr class="divider">
-                    <div class="section-head" style="margin-bottom:14px;">
-                        <h2><span></span>Land</h2>
-                    </div>
-                    <div class="field"><label>Land Price (Around)</label><input id="landPrice"></div>
-                    <div class="grid-2">
-                        <div class="field"><label>Extent</label><input id="extent"></div>
-                        <div class="field"><label>Sy. No.</label><input id="syno"></div>
-                    </div>
+                    <div class="section-head"><h2><span></span>Boundaries</h2></div>
+
+                    <div class="info-block" style="margin-bottom:14px;"><strong>Boundaries as per LS</strong></div>
+                    <table class="dir-table">
+                        <tr><td>N</td><td><input type="text" id="lsNorth" placeholder="North"></td></tr>
+                        <tr><td>S</td><td><input type="text" id="lsSouth" placeholder="South"></td></tr>
+                        <tr><td>E</td><td><input type="text" id="lsEast" placeholder="East"></td></tr>
+                        <tr><td>W</td><td><input type="text" id="lsWest" placeholder="West"></td></tr>
+                    </table>
+
+                    <div class="info-block" style="margin-bottom:14px;"><strong>Boundaries as per Actual Site</strong></div>
+                    <table class="dir-table">
+                        <tr><td>N</td><td><input type="text" id="actNorth" placeholder="North"></td></tr>
+                        <tr><td>S</td><td><input type="text" id="actSouth" placeholder="South"></td></tr>
+                        <tr><td>E</td><td><input type="text" id="actEast" placeholder="East"></td></tr>
+                        <tr><td>W</td><td><input type="text" id="actWest" placeholder="West"></td></tr>
+                    </table>
+
+                    <div class="info-block" style="margin-bottom:14px;"><strong>Demarcation</strong></div>
+                    <div class="field"><label>Demarcation Note</label><input type="text" id="demarcationNote" placeholder="e.g. compound walls on all sides"></div>
+                    <table class="dir-table">
+                        <tr><td>N</td><td><input type="text" id="demNorth" placeholder="North"></td></tr>
+                        <tr><td>S</td><td><input type="text" id="demSouth" placeholder="South"></td></tr>
+                        <tr><td>E</td><td><input type="text" id="demEast" placeholder="East"></td></tr>
+                        <tr><td>W</td><td><input type="text" id="demWest" placeholder="West"></td></tr>
+                    </table>
                 </div>
 
+                <!-- ═══ STEP 7: BUILDING ═══ -->
                 <div class="section" id="s7">
-                    <div class="section-head">
-                        <h2><span></span>Documents Given</h2>
-                    </div>
-                    <div class="field"><label>Deed (Date / SRO)</label>
-                        <div class="flex-input"><input type="date" id="docDeedDate"><input type="text" id="docDeedSro"
-                                placeholder="SRO Name"></div>
+                    <div class="section-head"><h2><span></span>Building Details</h2></div>
+                    <div class="grid-2">
+                        <div class="field"><label>Age (years)</label><input type="number" id="buildingAge" placeholder="e.g. 5"></div>
+                        <div class="field"><label>Area of Building</label><input type="text" id="areaOfBuilding" placeholder="e.g. 1200 sqft"></div>
                     </div>
                     <div class="grid-2">
-                        <div class="field"><label>LS Date</label><input type="date" id="docLsDate"></div>
-                        <div class="field"><label>LTR Date</label><input type="date" id="docLtrDate"></div>
-                    </div>
-                    <div class="grid-2">
-                        <div class="field"><label>Possession Date</label><input type="date" id="docPossDate"></div>
-                        <div class="field"><label>BTR Date</label><input type="date" id="docBtrDate"></div>
-                    </div>
-                    <div class="field"><label>EC Date</label><input type="date" id="docEcDate"></div>
-                </div>
-
-                <div class="section" id="s8">
-                    <div class="section-head">
-                        <h2><span></span>Route &amp; Remarks</h2>
-                    </div>
-                    <div class="info-block">
-                        <div class="field" style="margin-bottom:0;">
-                            <label>Start Point (Office / Landmark)</label>
-                            <div class="flex-input">
-                                <input type="text" id="routeStartPoint" placeholder="e.g. Federal Bank Kottayam">
-                                <button class="btn btn-primary btn-sm" id="btnAutoRoute"
-                                    onclick="autoGenerateRoute()">🚗 Auto-Route</button>
-                            </div>
-                            <div class="route-hint">Destination is auto-pulled from Step 3 GPS coordinates.</div>
+                        <div class="field"><label>Number of Floors</label><input type="text" id="numFloors" placeholder="e.g. 2"></div>
+                        <div class="field">
+                            <label>Roofing</label>
+                            <div id="roofingContainer" class="selection-group"></div>
+                            <input type="hidden" id="roofing">
                         </div>
                     </div>
-                    <div class="field"><label>Route Details <button class="btn-mic" onclick="startVoice('routeText')">🎙
-                                Speak</button></label><textarea id="routeText"></textarea></div>
-                    <div class="field"><label>Remarks &amp; Comments <button class="btn-mic"
-                                onclick="startVoice('remarks')">🎙 Speak</button></label><textarea
-                            id="remarks"></textarea></div>
-                    <div class="grid-2" style="margin-top:6px;">
-                        <div class="field"><label>File Received <button class="btn btn-secondary btn-sm"
-                                    onclick="setToday('fileReceived')">📅 Today</button></label><input type="date"
-                                id="fileReceived"></div>
-                        <div class="field"><label>Report Sent <button class="btn btn-secondary btn-sm"
-                                    onclick="setToday('reportSent')">📅 Today</button></label><input type="date"
-                                id="reportSent"></div>
+                    <div class="grid-2">
+                        <div class="field"><label>Flooring</label><input type="text" id="flooring" placeholder="e.g. Tiles, Marble"></div>
+                        <div class="field"><label>Water Source</label><input type="text" id="waterSource" placeholder="e.g. Well, Bore well"></div>
                     </div>
                 </div>
 
+                <!-- ═══ STEP 8: LAND ═══ -->
+                <div class="section" id="s8">
+                    <div class="section-head"><h2><span></span>Land Details</h2></div>
+                    <div class="field"><label>Land Price</label><input type="text" id="landPrice" placeholder="e.g. ₹5,00,000 per cent"></div>
+                    <div class="grid-2">
+                        <div class="field"><label>Extent</label><input type="text" id="extent" placeholder="e.g. 10 cents"></div>
+                        <div class="field"><label>Survey No (SYNO)</label><input type="text" id="syNo" placeholder="Survey number"></div>
+                    </div>
+                </div>
+
+                <!-- ═══ STEP 9: DOCUMENTS ═══ -->
                 <div class="section" id="s9">
+                    <div class="section-head"><h2><span></span>Documents</h2></div>
+                    <div class="info-block" style="margin-bottom:12px;">Enter document numbers, dates, and SRO details as available.</div>
+
+                    <div class="grid-2">
+                        <div class="field"><label>Deed No</label><input type="text" id="deedNo" placeholder="Deed number"></div>
+                        <div class="field"><label>Deed Date</label><input type="date" id="deedDate"></div>
+                    </div>
+                    <div class="field"><label>Deed SRO</label><input type="text" id="deedSRO" placeholder="SRO name"></div>
+
+                    <div class="grid-2">
+                        <div class="field"><label>LS No</label><input type="text" id="lsNo" placeholder="LS number"></div>
+                        <div class="field"><label>LS Date</label><input type="date" id="lsDate"></div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field"><label>LTR No</label><input type="text" id="ltrNo" placeholder="LTR number"></div>
+                        <div class="field"><label>LTR Date</label><input type="date" id="ltrDate"></div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field"><label>Possession No</label><input type="text" id="possessionNo" placeholder="Possession number"></div>
+                        <div class="field"><label>Possession Date</label><input type="date" id="possessionDate"></div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field"><label>BTR No</label><input type="text" id="btrNo" placeholder="BTR number"></div>
+                        <div class="field"><label>BTR Date</label><input type="date" id="btrDate"></div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="field"><label>EC No</label><input type="text" id="ecNo" placeholder="EC number"></div>
+                        <div class="field"><label>EC Date</label><input type="date" id="ecDate"></div>
+                    </div>
+                </div>
+
+                <!-- ═══ STEP 10: ROUTE & REMARKS ═══ -->
+                <div class="section" id="s10">
+                    <div class="section-head"><h2><span></span>Route & Remarks</h2></div>
+                    <div class="field">
+                        <label>Route Start Point</label>
+                        <div class="flex-input">
+                            <input type="text" id="routeStartPoint" placeholder="e.g. Federal Bank Kottayam">
+                            <button class="btn btn-primary btn-sm" id="btnAutoRoute" onclick="autoGenerateRoute()">🚗 Auto-Route</button>
+                        </div>
+                    </div>
+                    <div class="field"><label>Route Description</label><textarea id="routeText" rows="3" placeholder="Route directions..."></textarea></div>
+                    <div class="field"><label>Remarks & Comments</label><textarea id="remarks" rows="3" placeholder="Additional observations..."></textarea></div>
+
+                    <div class="grid-2">
+                        <div class="field"><label>File Received On</label><input type="date" id="fileReceivedOn"></div>
+                        <div class="field"><label>Report Sent Date</label><input type="date" id="reportSent"></div>
+                    </div>
+                    <div class="field"><label>Report Sent To</label><input type="text" id="reportSentTo" placeholder="Recipient name/email"></div>
+                </div>
+
+                <!-- ═══ STEP 11: REPORT & SUBMIT ═══ -->
+                <div class="section" id="s11">
                     <div class="section-head">
-                        <h2><span></span>Verified Photography</h2>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <select id="photoLabel" class="btn-secondary btn-sm"
-                                style="width:140px; height:32px; padding:0 8px; appearance:none; -webkit-appearance:none; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface-2); color:var(--text); font-family:'DM Sans',sans-serif; font-size:0.75rem;">
+                        <h2><span></span>Report & Submit</h2>
+                        <button class="btn btn-secondary btn-sm" onclick="generateReport()">📄 Generate</button>
+                    </div>
+
+                    <!-- Photo Section -->
+                    <div style="margin-bottom: 18px;">
+                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+                            <select id="photoLabel" class="btn-secondary btn-sm" style="flex:1;">
                                 <option>Front Elevation</option>
-                                <option>Side Right</option>
-                                <option>Side Left</option>
+                                <option>Side View</option>
                                 <option>Rear View</option>
-                                <option>Cellar/Basement</option>
-                                <option>Ground Floor</option>
-                                <option>Living/Dining</option>
-                                <option>Kitchen</option>
-                                <option>Showroom</option>
-                                <option>Lift/Stairs</option>
+                                <option>Interior</option>
+                                <option>Road Approach</option>
+                                <option>Surroundings</option>
                             </select>
                             <button class="btn btn-primary btn-sm" onclick="G('cameraInput').click()">📸 Snap</button>
                         </div>
+                        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleCapture(this)">
+                        <input type="file" id="retakeInput" accept="image/*" capture="environment" style="display:none" onchange="handleRetake(this)">
+                        <div id="photoGallery" class="photo-grid"></div>
+                        <div id="photoEmpty" style="text-align:center; padding:16px; color:var(--text-3); font-size:0.82rem;">No photos yet. Tap 📸 Snap to begin.</div>
                     </div>
 
-                    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none"
-                        onchange="handleCapture(this, null)">
-                    <input type="file" id="retakeInput" accept="image/*" capture="environment" style="display:none"
-                        onchange="handleRetake(this)">
+                    <!-- Report Preview -->
+                    <textarea id="reportOutput" class="report-box" readonly style="min-height: 500px;"></textarea>
 
-                    <div id="photoGpsBar"
-                        style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--surface-2); margin-bottom:10px; font-size:0.72rem;">
-                        <span id="photoGpsIcon">📍</span>
-                        <span id="photoGpsText" style="color:var(--text-2); flex:1;">GPS not locked — go to Step 4 first
-                            for accurate coordinates</span>
-                        <span id="photoGpsCoords"
-                            style="font-family:'DM Mono',monospace; font-size:0.63rem; color:var(--primary);"></span>
+                    <div style="display: flex; gap: 8px; margin-top: 12px;">
+                        <button class="btn btn-secondary" onclick="copyReport()" style="flex:1;">📋 Copy Report</button>
                     </div>
 
-                    <div id="photoGallery" class="photo-grid"></div>
-
-                    <div id="photoEmpty"
-                        style="text-align:center; padding:30px 20px; color:var(--text-3); font-size:0.8rem; display:none;">
-                        <div style="font-size:2rem; margin-bottom:8px; opacity:0.4;">📷</div>
-                        No photos yet. Tap <strong>📸 Snap</strong> to capture.
-                    </div>
-
-                    <div class="info-block" style="margin-top:12px; background:rgba(59,130,246,0.05);">
-                        <p style="font-size:0.7rem; color:var(--text-2); line-height:1.6;">
-                            <strong>🔒 Verification Burn:</strong> Each photo is stamped with GPS coordinates, short
-                            address, label and timestamp — permanently baked into the image. Tap any photo to inspect
-                            the watermark in full size.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="section" id="s10">
-                    <div class="section-head">
-                        <h2><span></span>Generated Report</h2>
-                    </div>
-                    <div class="report-actions">
-                        <button class="btn btn-primary btn-sm" onclick="genReport()">🔄 Refresh</button>
-                        <button class="btn btn-secondary btn-sm" onclick="copyReport()">📋 Copy Text</button>
-                        <button class="btn btn-secondary btn-sm" onclick="saveToHistory()"
-                            style="border-color:rgba(99,102,241,0.4); color:#a5b4fc; background:rgba(99,102,241,0.08);">🗂
-                            Save to History</button>
-                    </div>
-                    <textarea id="reportOutput" class="report-box" readonly></textarea>
-                </div>
-
-                <div class="section" id="s11">
-                    <div class="section-head">
-                        <h2><span></span>Secure Submit</h2>
-                    </div>
-
-                    <div class="file-no-display">
-                        <div class="label">File Number</div>
-                        <div class="value" id="fileNoDisplay">—</div>
-                    </div>
-
-                    <div class="field"><label>Secure Web App URL</label><input type="text" id="gasUrl"
-                            placeholder="https://script.google.com/macros/s/…/exec" onchange="saveCreds()"></div>
-                    <div class="field"><label>Report Sent To (Email)</label><input type="email" id="sendToEmail"
-                            placeholder="office@gmail.com" onchange="saveCreds()"></div>
-
-                    <div style="margin-top:18px;">
-                        <button class="btn btn-primary" onclick="submitWithOfflineSupport()" id="submitBtn">📤 Encrypt
-                            &amp; Send</button>
-                    </div>
-
-                    <div class="status-box" id="submitResult"></div>
-
-                    <div id="offlineQueuePanel" class="offline-queue" style="display:none;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div style="font-size:0.84rem; font-weight:600; color:#fbbf24;">📡 Offline Queue (<span
-                                    id="queueCount">0</span>)</div>
-                            <button class="btn btn-warn btn-sm" onclick="syncOfflineQueue()" id="syncBtn">🔄
-                                Sync</button>
+                    <!-- Submit Section -->
+                    <div style="margin-top: 18px;">
+                        <div class="file-no-display">
+                            <div class="label">File Number</div>
+                            <div class="value" id="fileNoDisplay">—</div>
                         </div>
-                        <div id="queueList"
-                            style="margin-top:10px; font-size:0.73rem; max-height:100px; overflow-y:auto; font-family:'DM Mono', monospace; color:var(--text-2);">
-                        </div>
+                        <div class="field"><label>Secure API URL</label><input type="text" id="gasUrl"></div>
+                        <button class="btn btn-primary" id="submitBtn" onclick="submitWithOfflineSupport()" style="width:100%; padding: 12px;">📤 Encrypt & Send</button>
+                        <div id="submitResult" class="status-box"></div>
                     </div>
                 </div>
 
-            </div>
+            </div><!-- /form-body -->
+
+            <!-- Footer Navigation -->
             <div class="step-footer">
-                <button class="btn btn-secondary" id="prevBtn" onclick="prevStep()" style="visibility:hidden">←
-                    Back</button>
+                <button class="btn btn-secondary" id="prevBtn" onclick="prevStep()" style="visibility: hidden;">◀ Back</button>
                 <div class="step-counter">
                     <span id="stepInd">1 / 12</span>
-                    <div class="bar">
-                        <div class="bar-fill" id="progressBar"></div>
-                    </div>
+                    <div class="bar"><div class="bar-fill" id="progressBar"></div></div>
                 </div>
-                <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">Next →</button>
+                <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">Next ▶</button>
             </div>
+        </div><!-- /card -->
+    </div><!-- /wrapper -->
 
+    <!-- ═══ PHOTO LIGHTBOX ═══ -->
+    <div id="photoLightbox" class="lightbox-overlay">
+        <div class="lightbox-content">
+            <div class="lb-top-bar">
+                <span id="lbCounter">1 of 1</span>
+                <button class="icon-btn" onclick="closeLightbox()">✕</button>
+            </div>
+            <button class="lb-nav-btn lb-prev" id="lbPrev" onclick="lbNav(-1)">‹</button>
+            <img id="lbImage" class="lb-img" src="" alt="Photo">
+            <button class="lb-nav-btn lb-next" id="lbNext" onclick="lbNav(1)">›</button>
+            <div class="lb-info">
+                <div id="lbLabel" class="lb-label"></div>
+                <div class="lb-verify-row"><span id="lbGpsIcon"></span> <span id="lbGpsText"></span></div>
+                <div class="lb-verify-row">📍 <span id="lbAddrText"></span></div>
+                <div class="lb-verify-row">🕐 <span id="lbTimeText"></span></div>
+                <div id="lbBurnStatus" class="lb-verify-text"></div>
+            </div>
+            <div class="lb-actions">
+                <button class="btn btn-secondary btn-sm" onclick="lbRetake()">🔄 Retake</button>
+                <button class="btn btn-secondary btn-sm" onclick="lbRename()">✏️ Rename</button>
+                <button class="btn btn-warn btn-sm" onclick="lbDelete()">🗑 Delete</button>
+            </div>
         </div>
     </div>
 
-    <div id="photoLightbox">
-        <div class="lb-topbar">
-            <div>
-                <div class="lb-label" id="lbLabel">Front Elevation</div>
-                <div class="lb-counter" id="lbCounter">1 of 1</div>
-            </div>
-            <button class="lb-arrow" style="position:static; transform:none; margin-left:auto;"
-                onclick="closeLightbox()">✕</button>
-        </div>
-
-        <div class="lb-img-wrap">
-            <button class="lb-arrow left" id="lbPrev" onclick="lbNav(-1)">‹</button>
-            <img id="lbImage" src="" alt="Photo">
-            <button class="lb-arrow right" id="lbNext" onclick="lbNav(1)">›</button>
-        </div>
-
-        <div class="lb-verify-panel" id="lbVerifyPanel">
-            <div class="lb-verify-row">
-                <span class="lb-verify-icon" id="lbGpsIcon">📍</span>
-                <span class="lb-verify-text" id="lbGpsText">—</span>
-            </div>
-            <div class="lb-verify-row">
-                <span class="lb-verify-icon">🏠</span>
-                <span class="lb-verify-text" id="lbAddrText">—</span>
-            </div>
-            <div class="lb-verify-row">
-                <span class="lb-verify-icon">🕐</span>
-                <span class="lb-verify-text" id="lbTimeText">—</span>
-            </div>
-            <div class="lb-verify-row">
-                <span class="lb-verify-icon">🔒</span>
-                <span class="lb-verify-text lb-verify-ok" id="lbBurnStatus">Watermark burned into image ✓</span>
-            </div>
-        </div>
-
-        <div class="lb-actions">
-            <button class="lb-btn lb-btn-retake" onclick="lbRetake()">🔄 Retake</button>
-            <button class="lb-btn lb-btn-rename" onclick="lbRename()">✏️ Rename</button>
-            <button class="lb-btn lb-btn-delete" onclick="lbDelete()">🗑 Delete</button>
-        </div>
-    </div>
-
-    <div id="dashboardOverlay">
-
+    <!-- ═══ DASHBOARD OVERLAY ═══ -->
+    <div id="dashboardOverlay" class="dash-overlay">
         <div class="dash-header">
-            <div class="dash-header-left">
-                <div class="logo-mark" style="background: rgba(99,102,241,0.85);">
-                    <svg viewBox="0 0 24 24">
-                        <rect x="3" y="3" width="7" height="7" rx="1" />
-                        <rect x="14" y="3" width="7" height="7" rx="1" />
-                        <rect x="3" y="14" width="7" height="7" rx="1" />
-                        <rect x="14" y="14" width="7" height="7" rx="1" />
-                    </svg>
-                </div>
-                <div>
-                    <div class="dash-title">Work History</div>
-                    <div class="dash-subtitle">Temporary · Clears after 24 hrs</div>
-                </div>
-            </div>
-            <button class="icon-btn" onclick="closeDashboard()" title="Close">✕</button>
+            <div class="dash-title">Work History</div>
+            <button class="icon-btn" onclick="closeDashboard()">✕</button>
         </div>
-
         <div class="dash-stats">
-            <div class="stat-box">
-                <div class="val" id="dStatTotal">0</div>
-                <div class="lbl">Total</div>
-            </div>
-            <div class="stat-box">
-                <div class="val" id="dStatSynced" style="color:var(--success)">0</div>
-                <div class="lbl">Synced</div>
-            </div>
-            <div class="stat-box">
-                <div class="val" id="dStatExpiring" style="color:var(--warn)">0</div>
-                <div class="lbl">Expiring</div>
-            </div>
+            <div class="stat-box"><div class="val" id="dStatTotal">0</div><div class="lbl">Total</div></div>
+            <div class="stat-box"><div class="val" id="dStatSynced" style="color:var(--success)">0</div><div class="lbl">Synced</div></div>
         </div>
-
-        <div class="dash-toolbar">
-            <input class="dash-search" id="dashSearch" type="text" placeholder="Search by name, bank, file no…"
-                oninput="renderDashboard()">
-            <button class="btn btn-secondary btn-sm" onclick="purgeExpired(); renderDashboard();">🧹 Clear
-                Expired</button>
-        </div>
-
-        <div class="dash-body" id="dashBody">
-            <div class="dash-empty">
-                <div class="icon">📂</div>
-                <p>No saved reports yet.<br>Complete a report and tap <strong>🗂 Save to History</strong>.</p>
-            </div>
-        </div>
-
+        <div class="dash-body" id="dashBody"></div>
     </div>
 
+    <!-- ═══ TOAST ═══ -->
     <div class="toast" id="toast"></div>
 
-    <script>
-
-        
-        // ── Core ──────────────────────────────────────────────────────────────────────
-        const G = id => document.getElementById(id);
-        const V = id => G(id)?.value.trim() || '';
-        let _lastReverseAddress = ''; // cached from reverse geocode, used in photo watermark
-        function toast(msg, dur = 3000) {
-            const t = G('toast'); t.textContent = msg;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), dur);
-        }
-
-        function resetApp() {
-            if (confirm("Reset the entire form? This will wipe your current draft.")) {
-                localStorage.removeItem('sif_draft');
-                G('fileNoDisplay').textContent = '—';
-                location.reload();
-            }
-        }
-
-        function sanitizeHTML(str) {
-            if (typeof str !== 'string') return str;
-            return str.replace(/[&<>'"]/g, tag => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-            }[tag]));
-        }
-        // ── Theme ─────────────────────────────────────────────────────────────────────
-        function toggleTheme() {
-            const html = document.documentElement;
-            const n = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-            html.setAttribute('data-theme', n);
-            localStorage.setItem('sif_theme', n);
-            G('themeToggleBtn').textContent = n === 'light' ? '🌙' : '☀️';
-        }
-        (function initTheme() {
-            const saved = localStorage.getItem('sif_theme') || 'dark';
-            document.documentElement.setAttribute('data-theme', saved);
-            window.addEventListener('DOMContentLoaded', () => {
-                G('themeToggleBtn').textContent = saved === 'light' ? '🌙' : '☀️';
-            });
-        })();
-
-        // ── Voice & Dates ─────────────────────────────────────────────────────────────
-        function startVoice(targetId) {
-            if (!('webkitSpeechRecognition' in window)) return toast('❌ Voice not supported on this browser.');
-            const rec = new webkitSpeechRecognition();
-            rec.continuous = false; rec.interimResults = false;
-            rec.onstart = () => toast('🎙 Listening… speak now.');
-            rec.onresult = (e) => {
-                const box = G(targetId);
-                box.value += (box.value ? ' ' : '') + e.results[0][0].transcript;
-                saveDraft(); toast('✅ Text added!');
-            };
-            rec.start();
-        }
-        function setToday(id) { G(id).value = new Date().toISOString().split('T')[0]; saveDraft(); }
-        function formatDateDisplay(d) { if (!d) return ''; const [y, m, dd] = d.split('-'); return `${dd}/${m}/${y}`; }
-
-        // ── Draft (Auto-save every 30s instead of every keystroke) ─────────────────
-        let _draftDirty = false;
-        function saveDraft() {
-            const draft = {};
-            document.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(el => {
-                if (el.id && !['gasUrl', 'sendToEmail'].includes(el.id)) draft[el.id] = el.value;
-            });
-            localStorage.setItem('sif_draft', JSON.stringify(draft));
-            _draftDirty = false;
-        }
-
-        // ── FIX 2: Enhanced Draft Loader ──────────────────────────────────────────
-        function loadDraft() {
-            try {
-                const draft = JSON.parse(localStorage.getItem('sif_draft'));
-                if (draft) {
-                    Object.keys(draft).forEach(id => { if (G(id)) G(id).value = draft[id]; });
-
-                    // Re-trigger UI states based on loaded data
-                    if (G('bankName') && G('bankName').value === 'Other') {
-                        if (G('otherBankDiv')) G('otherBankDiv').style.display = 'block';
-                    }
-                    toggleLocalBody(V('panchayatInput') ? 'panchayat' : V('municipalityInput') ? 'municipality' : '');
-                }
-            } catch (e) { console.error("Draft load failed", e); }
-        }
-
-        // Mark dirty on any input, but DON'T save immediately
-        document.addEventListener('input', () => { _draftDirty = true; });
-        // Save only every 30 seconds if something changed
-        setInterval(() => { if (_draftDirty) { saveDraft(); toast('💾 Draft saved', 1500); } }, 30000);
-        // Always save before the user leaves the page
-        window.addEventListener('beforeunload', () => { if (_draftDirty) saveDraft(); });
-
-        // ── Navigation ────────────────────────────────────────────────────────────────
-        const STEPS = ['Loan', 'Persons', 'Address', 'Location', 'Distances', 'Bounds', 'Details', 'Docs', 'Route', 'Photos', 'Report', 'Submit'];
-        let cur = 0; const TOTAL = STEPS.length;
-
-        function buildNav() {
-            G('stepsNav').innerHTML = STEPS.map((s, i) =>
-                `<button class="step-btn ${i === 0 ? 'active' : ''}" id="navBtn${i}" onclick="goTo(${i})">${i + 1}. ${s}</button>`
-            ).join('');
-            if (G('gasUrl')) G('gasUrl').value = localStorage.getItem('sif_url') || '';
-            if (G('sendToEmail')) G('sendToEmail').value = localStorage.getItem('sif_email') || '';
-            loadDraft(); updateQueueUI(); updateStepUI();
-        }
-
-        function goTo(n) {
-            if (n === 10) genReport();
-            if (n === 11 && G('fileNoDisplay').textContent === '—')
-                G('fileNoDisplay').textContent = `SIF-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 1).padStart(3, '0')}`;
-            G(`s${cur}`).classList.remove('active'); G(`navBtn${cur}`).classList.remove('active');
-            if (cur !== n) G(`navBtn${cur}`).classList.add('done');
-            cur = n;
-            G(`s${cur}`).classList.add('active'); G(`navBtn${cur}`).classList.add('active'); G(`navBtn${cur}`).classList.remove('done');
-            updateStepUI(); G(`navBtn${cur}`).scrollIntoView({ behavior: 'smooth', inline: 'center' });
-            if (n === 3) setTimeout(async () => { await initMap(); map.invalidateSize(); updateMapFromInput(); }, 200);
-            if (n === 9) updatePhotoGpsBar();
-        }
-        function nextStep() { if (cur < TOTAL - 1) goTo(cur + 1); }
-        function prevStep() { if (cur > 0) goTo(cur - 1); }
-        function updateStepUI() {
-            G('prevBtn').style.visibility = cur === 0 ? 'hidden' : 'visible';
-
-            // 🚀 FIX: Hide the bottom 'Next' button entirely on the final step
-            G('nextBtn').style.display = cur === TOTAL - 1 ? 'none' : 'inline-flex';
-
-            G('stepInd').textContent = `${cur + 1} / ${TOTAL}`;
-            G('progressBar').style.width = `${((cur + 1) / TOTAL) * 100}%`;
-        }
-        function saveCreds() { localStorage.setItem('sif_url', V('gasUrl')); localStorage.setItem('sif_email', V('sendToEmail')); }
-
-        // ── Kerala Location Data ───────────────────────────────────────────────────────
-        const VD = { Changanassery: ["Changanassery", "Chethipuzha", "Kangazha", "Karukachal", "Kurichy", "Madappally", "Nedumkunnam", "Paippadu", "Thottakkadu", "Thrikkodithanam", "Vakathanam", "Vazhappally East", "Vazhappally West", "Vazhoor", "Vellavoor"], Kanjirappally: ["Cheruvally", "Chirakkadavu", "Edakkunnam", "Elamgulam", "Elikkulam", "Erumeli North", "Erumeli South", "Kanjirappally", "Koottickal", "Koovappally", "Koruthode", "Manimala", "Mundakayam"], Kottayam: ["Akalakunnam", "Anicadu", "Arpookara", "Athirampuzha", "Ayarkunnam", "Aymanam", "Chengalam East", "Chengalam South", "Ettumanoor", "Kaipuzha", "Kooroppada", "Kottayam", "Kumarakom", "Manarcadu", "Meenadom", "Muttambalam", "Nattakom", "Onamthuruthu", "Pampady", "Panachikkad", "Peroor", "Perumpaicadu", "Puthuppally", "Thiruvarppu", "Veloor", "Vijayapuram"], Meenachil: ["Bharananganam", "Elakkadu", "Kadanadu", "Kadaplamattom", "Kanakkary", "Kidangoor", "Kondoor", "Kuravilangadu", "Kurichithanam", "Lalam", "Meenachil", "Melukavu", "Monippally", "Moonnilavu", "Poonjar", "Poonjar Nadubhagam", "Poonjar Thekkekara", "Poovarany", "Puliyannoor", "Ramapuram", "Thalanadu", "Thalappalam", "Teekoy", "Uzhavoor", "Vallichira", "Veliyannoor", "Vellilappally"], Vaikom: ["Chempu", "Kaduthuruthy", "Kallara", "Kothanalloor", "Kulasekharamangalam", "Manjoor", "Mulakkulam", "Muttuchira", "Naduvila", "Njeezhoor", "T V Puram", "Thalayazham", "Udayanapuram", "Vadakkemuri", "Vadayar", "Vaikom", "Vechoor", "Velloor"] };
-        const PD = { Changanassery: ["Kangazha", "Karukachal", "Kurichy", "Madappally", "Nedumkunnam", "Paippad", "Thottakkadu", "Thrikkodithanam", "Vakathanam", "Vazhappally", "Vazhoor", "Vellavoor"], Kanjirappally: ["Chirakkadavu", "Edakkunnam", "Elikkulam", "Erumeli", "Kanjirappally", "Koottickal", "Koruthode", "Manimala", "Mundakayam", "Parathodu"], Kottayam: ["Akalakunnam", "Arpookara", "Athirampuzha", "Ayarkunnam", "Aymanam", "Kaipuzha", "Kooroppada", "Kumarakom", "Manarcadu", "Meenadom", "Neendoor", "Pampady", "Panachikkad", "Puthuppally", "Thiruvarppu", "Vijayapuram"], Meenachil: ["Bharananganam", "Kadanadu", "Kadaplamattom", "Kanakkary", "Kidangoor", "Kozhuvanal", "Kuravilangadu", "Marangattupilly", "Melukavu", "Moonnilavu", "Mutholy", "Poonjar", "Poonjar Thekkekara", "Ramapuram", "Teekoy", "Thalanadu", "Thalappalam", "Uzhavoor", "Veliyannoor"], Vaikom: ["Chempu", "Kaduthuruthy", "Kallara", "Manjoor", "Maravanthuruthu", "Mulakkulam", "Njeezhoor", "T V Puram", "Thalayazham", "Udayanapuram", "Vechoor", "Velloor"] };
-        const MD = { Changanassery: ["Changanassery Municipality"], Kanjirappally: [], Kottayam: ["Kottayam Municipality", "Ettumanoor Municipality"], Meenachil: ["Pala Municipality", "Erattupetta Municipality"], Vaikom: ["Vaikom Municipality"] };
-
-        function acShow(type, q) {
-            const t = V('taluk'); const dd = G('ac' + type.charAt(0).toUpperCase() + type.slice(1));
-            if (!t || !q) { dd.classList.remove('open'); return; }
-            const list = (type === 'village' ? VD : type === 'panchayat' ? PD : MD)[t] || [];
-            const matches = list.filter(x => x.toLowerCase().includes(q.toLowerCase()));
-            if (matches.length > 0) {
-                dd.innerHTML = matches.map(m => `<div class="ac-item" onmousedown="G('${type}Input').value='${m}'; G('ac${type.charAt(0).toUpperCase() + type.slice(1)}').classList.remove('open'); saveDraft();">${m}</div>`).join('');
-                dd.classList.add('open');
-            } else { dd.classList.remove('open'); }
-        }
-        document.addEventListener('mousedown', e => { if (!e.target.closest('.ac-wrap')) document.querySelectorAll('.ac-dd').forEach(d => d.classList.remove('open')); });
-
-        // ── Postal API ────────────────────────────────────────────────────────────────
-        let poTimer;
-        function searchPO(q) {
-            clearTimeout(poTimer);
-            if (q.length < 3) { G('acPostoffice').classList.remove('open'); return; }
-            poTimer = setTimeout(async () => {
-                try {
-                    const ep = /^\d+$/.test(q) ? 'pincode' : 'postoffice';
-                    const res = await fetch(`https://api.postalpincode.in/${ep}/${q}`);
-                    const data = await res.json();
-                    if (data && data[0].Status === 'Success') {
-                        G('acPostoffice').innerHTML = data[0].PostOffice.slice(0, 5).map(p =>
-                            `<div class="ac-item" onmousedown="selectPostOffice('${p.Name}', '${p.Pincode}', '${p.Block || ''}')">
-            <strong>${p.Name}</strong> <span style="font-size:0.75rem; color:var(--text-2)">(${p.Pincode})</span>
-          </div>`
-                        ).join('');
-                        G('acPostoffice').classList.add('open');
-                    } else {
-                        G('acPostoffice').innerHTML = `<div class="ac-item" style="color:var(--text-2); cursor:default;">No results found</div>`;
-                        G('acPostoffice').classList.add('open');
-                    }
-                } catch (e) { console.error("PO API Error:", e); }
-            }, 500);
-        }
-
-        // ── Post Office Selection → auto-paste into Address & Auto-fill Location ───
-        function selectPostOffice(name, pin, block) {
-            G('postoffice').value = `${name} - ${pin}`;
-            G('acPostoffice').classList.remove('open');
-
-            // Auto-append "Name PO, Pincode" as 2nd line of address
-            const addr = G('address');
-            const firstLine = addr.value.split('\n')[0] || ''; // Keep user's house/flat/survey line
-            addr.value = firstLine + '\n' + name + ' PO, ' + pin;
-
-            // Try to auto-select Taluk based on Postal Block
-            const talukSelect = G('taluk');
-            let matchedTaluk = '';
-            if (block) {
-                // Check if block matches any option in taluk select
-                for (let i = 0; i < talukSelect.options.length; i++) {
-                    if (talukSelect.options[i].value && block.toLowerCase().includes(talukSelect.options[i].value.toLowerCase())) {
-                        talukSelect.selectedIndex = i;
-                        matchedTaluk = talukSelect.options[i].value;
-                        // trigger change event to clear dependent fields
-                        const event = new Event('change');
-                        talukSelect.dispatchEvent(event);
-                        break;
-                    }
-                }
-            }
-
-            // Try to auto-fill Village, Panchayat, Municipality if Taluk is matched
-            let locationMsg = '';
-            if (matchedTaluk) {
-                locationMsg = ` and Taluk set to ${matchedTaluk}`;
-                // Helper to check if name matches dictionary entry
-                const matchInDict = (dict, tlk, query) => {
-                    const list = dict[tlk] || [];
-                    return list.find(item => item.toLowerCase().includes(query.toLowerCase()) || query.toLowerCase().includes(item.toLowerCase().replace(' municipality', '')));
-                };
-
-                const matchedVillage = matchInDict(VD, matchedTaluk, name);
-                if (matchedVillage) G('villageInput').value = matchedVillage;
-
-                const matchedPanchayat = matchInDict(PD, matchedTaluk, name);
-                const matchedMunicipality = matchInDict(MD, matchedTaluk, name);
-
-                if (matchedMunicipality) {
-                    G('municipalityInput').value = matchedMunicipality;
-                    toggleLocalBody('municipality');
-                } else if (matchedPanchayat) {
-                    G('panchayatInput').value = matchedPanchayat;
-                    toggleLocalBody('panchayat');
-                }
-            }
-
-            saveDraft();
-            toast(`📬 Post Office added${locationMsg}`, 2500);
-        }
-
-        // ── Panchayat / Municipality — Mutually Exclusive ─────────────────────────
-        function toggleLocalBody(active) {
-            const panInput = G('panchayatInput');
-            const munInput = G('municipalityInput');
-            const panHint = G('panchayatHint');
-            const munHint = G('municipalityHint');
-
-            if (active === 'panchayat' && panInput.value.trim()) {
-                munInput.value = '';
-                munInput.disabled = true;
-                munInput.style.opacity = '0.4';
-                munHint.textContent = '(locked — Panchayat selected)';
-                panHint.textContent = '';
-                panInput.disabled = false;
-                panInput.style.opacity = '1';
-            } else if (active === 'municipality' && munInput.value.trim()) {
-                panInput.value = '';
-                panInput.disabled = true;
-                panInput.style.opacity = '0.4';
-                panHint.textContent = '(locked — Municipality selected)';
-                munHint.textContent = '';
-                munInput.disabled = false;
-                munInput.style.opacity = '1';
-            } else {
-                // Both empty → unlock both
-                panInput.disabled = false; panInput.style.opacity = '1'; panHint.textContent = '';
-                munInput.disabled = false; munInput.style.opacity = '1'; munHint.textContent = '';
-            }
-        }
-
-        // ── Lazy Leaflet Loader ────────────────────────────────────────────────────
-        let _leafletLoaded = false;
-        function loadLeaflet() {
-            return new Promise((resolve) => {
-                if (_leafletLoaded) return resolve();
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-                script.onload = () => { _leafletLoaded = true; resolve(); };
-                document.head.appendChild(script);
-            });
-        }
-
-        // ── Map ───────────────────────────────────────────────────────────────────────
-        let map, marker;
-        async function initMap() {
-            if (map) return;
-            await loadLeaflet();
-            map = L.map('mapPreview').setView([9.5916, 76.5222], 10);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-            map.on('click', function (e) {
-                placeMarker(e.latlng.lat, e.latlng.lng);
-                G('locationCoords').value = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
-                saveDraft();
-            });
-        }
-        function placeMarker(lat, lng) {
-            if (marker) map.removeLayer(marker);
-            marker = L.marker([lat, lng]).addTo(map);
-            map.setView([lat, lng], 15);
-        }
-        function updateMapFromInput() {
-            const coords = V('locationCoords').split(',');
-            if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) placeMarker(parseFloat(coords[0]), parseFloat(coords[1]));
-        }
-
-        // ── GPS + Reverse Geocoding Auto-Fill ──────────────────────────────────────
-// ── 🔒 SECURE GPS MEMORY LOCK ─────────────────────────────────────────────
-        let _secureGpsLock = 'GPS NOT LOCKED'; // Cannot be easily edited via DevTools
-
-        function getShortAddr() {
-            if (!navigator.geolocation) return toast('❌ GPS unavailable');
-            toast('📍 Locating…');
-            const btn = event.target; btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
-            
-            navigator.geolocation.getCurrentPosition(async pos => {
-                const lat = pos.coords.latitude; const lng = pos.coords.longitude;
-                const secureCoords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-                
-                _secureGpsLock = secureCoords; // Lock it in JS memory
-                G('locationCoords').value = secureCoords; // Display it for the user
-                
-                initMap().then(() => { placeMarker(lat, lng); }); saveDraft();
-                toast('✅ Location locked! Fetching address…');
-                btn.innerHTML = '📍 Auto GPS'; btn.disabled = false;
-
-                // Reverse geocode
-                try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
-                    const data = await res.json();
-                    if (data && data.address) {
-                        const a = data.address;
-                        if (!V('address')) G('address').value = data.display_name?.split(',').slice(0, 3).join(', ') || '';
-                        if (!V('locality')) G('locality').value = a.suburb || a.neighbourhood || a.hamlet || '';
-                        if (!V('ward')) G('ward').value = a.county_district || '';
-                        toast('📝 Address auto-filled', 4000);
-                        _lastReverseAddress = data.display_name?.split(',').slice(0, 4).join(', ') || secureCoords;
-                    }
-                } catch (e) { }
-            }, () => { toast('❌ Permission denied'); btn.innerHTML = '📍 Auto GPS'; btn.disabled = false; }, 
-            { enableHighAccuracy: true, maximumAge: 0 }); // Force fresh GPS ping
-        }
-        // ── Distance Calculator ───────────────────────────────────────────────────────
-        function haversineDist(lat1, lon1, lat2, lon2) {
-            const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-        // ── Distance Calculator with Fallback Routing ─────────────────────────────────
-        function haversineDist(lat1, lon1, lat2, lon2) {
-            const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-
-        async function autoCalcDistances() {
-            const coords = V('locationCoords');
-            if (!coords || coords === 'GPS NOT LOCKED') {
-                goTo(3);
-                return toast('⚠ Please get GPS location first!');
-            }
-
-            const [lat, lng] = coords.split(',').map(n => parseFloat(n.trim()));
-            const btn = G('btnCalcDist');
-            btn.innerHTML = '<span class="spinner"></span> Scanning…';
-            btn.disabled = true;
-
-            toast('📡 Scanning 25km radius (Searching servers)…', 4000);
-
-            const query = `[out:json][timeout:25];(node["amenity"="police"](around:15000,${lat},${lng});node["amenity"="hospital"](around:15000,${lat},${lng});node["railway"="station"](around:25000,${lat},${lng});node["amenity"="bus_station"](around:15000,${lat},${lng});node["place"~"town|city"](around:20000,${lat},${lng}););out center;`;
-
-            // 🚀 ENTERPRISE FIX: Multiple Overpass Mirrors
-            const endpoints = [
-                'https://overpass-api.de/api/interpreter',         // Main German Server
-                'https://overpass.kumi.systems/api/interpreter',   // Fast Alt Server
-                'https://maps.mail.ru/osm/tools/overpass/api/interpreter' // Russian Fallback
-            ];
-
-            let success = false;
-
-            for (const endpoint of endpoints) {
-                try {
-                    const res = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: 'data=' + encodeURIComponent(query)
-                    });
-
-                    if (!res.ok) continue; // If server gives 429 Busy, skip to next mirror
-
-                    const data = await res.json();
-                    const findClosest = (key, regex) => {
-                        let closest = null, minDist = Infinity;
-                        data.elements.forEach(e => {
-                            if (e.tags?.[key]?.match(regex) && e.tags.name) {
-                                const d = haversineDist(lat, lng, e.lat, e.lon);
-                                if (d < minDist) { minDist = d; closest = `${e.tags.name} (${d.toFixed(1)} km)`; }
-                            }
-                        });
-                        return closest;
-                    };
-
-                    const police = findClosest('amenity', /police/);
-                    const hospital = findClosest('amenity', /hospital/);
-                    const railway = findClosest('railway', /station/);
-                    const bus = findClosest('amenity', /bus_station/);
-                    const town = findClosest('place', /town|city/);
-
-                    if (police) G('nearPolice').value = police;
-                    if (hospital) G('nearHospital').value = hospital;
-                    if (railway) G('nearRailway').value = railway;
-                    if (bus) G('nearBus').value = bus;
-                    if (town) G('nearTown').value = town;
-
-                    saveDraft();
-                    toast('✅ Distances filled!');
-                    success = true;
-                    break; // Stop looping if we successfully got data
-
-                } catch (e) {
-                    console.warn(`Overpass mirror failed: ${endpoint}`);
-                }
-            }
-
-            if (!success) {
-                toast('❌ API error. All global servers are currently busy.');
-            }
-
-            btn.innerHTML = '📡 Auto-Fill';
-            btn.disabled = false;
-        }
-        // ── Auto Route ────────────────────────────────────────────────────────────────
-        async function autoGenerateRoute() {
-            const start = V('routeStartPoint'); const coords = V('locationCoords');
-            if (!start) return toast('⚠ Please enter a start point.');
-            if (!coords) return toast('⚠ Please get GPS coordinates first (Step 3).');
-            const [lat, lng] = coords.split(',').map(n => parseFloat(n.trim()));
-            const btn = G('btnAutoRoute'); btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
-            toast('🚗 Generating route…', 3000);
-            try {
-                const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(start)}`);
-                const geoData = await geoRes.json();
-                if (!geoData.length) { toast('❌ Start location not found.'); btn.innerHTML = '🚗 Auto-Route'; btn.disabled = false; return; }
-                const sLat = parseFloat(geoData[0].lat), sLon = parseFloat(geoData[0].lon);
-                const routeRes = await fetch(`https://router.project-osrm.org/route/v1/driving/${sLon},${sLat};${lng},${lat}?overview=false`);
-                const routeData = await routeRes.json();
-                if (routeData.code !== 'Ok') throw new Error('Route error');
-                const distKm = (routeData.routes[0].distance / 1000).toFixed(1);
-                const timeMin = Math.round(routeData.routes[0].duration / 60);
-                G('routeText').value = `${start} → Site (GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)})\nTotal Distance: ${distKm} km | Est. Time: ~${timeMin} min`;
-                saveDraft(); toast('✅ Route summary generated!');
-            } catch (e) { toast('❌ Could not generate route.'); }
-            finally { btn.innerHTML = '🚗 Auto-Route'; btn.disabled = false; }
-        }
-
-        // ── Report ────────────────────────────────────────────────────────────────────
-        function genReport() {
-            const bank = V('bankName') === 'Other' ? V('otherBank') : V('bankName');
-            const lines = [
-                `Bank Name : ${bank}`, `Loan Type   : ${V('loanType')}`,
-                `Applicant Name : ${V('applicantName')}`, `Owner Name      : ${V('ownerName')}`,
-                `Occupied by   : ${V('occupiedBy')}`, `Site shown by : ${V('siteShownBy')}`, ``,
-                `Property Address : ${V('address')}`, ``, `Phone number : ${V('phoneNumber')}`, ``,
-                `District          : Kottayam`, `Taluk              : ${V('taluk')}`,
-                `Village           : ${V('villageInput')}`, `Panchayat    : ${V('panchayatInput')}`,
-                `Municipality : ${V('municipalityInput')}`, `Locality         : ${V('locality')}`,
-                `Ward             : ${V('ward')}`, `Door no        : ${V('doorNo')}`, ``,
-                `Location       : ${V('locationCoords')}`, ``,
-                `Nearest landmark : ${V('nearLandmark')}`, `Nearest Branch     : ${V('nearBranch')}`,
-                `Distance from office : ${V('distOffice')}`, `Nearest Police Station : ${V('nearPolice')}`,
-                `Nearest Railway Station : ${V('nearRailway')}`, `Nearest Bus stop          : ${V('nearBus')}`,
-                `Nearest Town      : ${V('nearTown')}`, `Nearest Hospital : ${V('nearHospital')}`,
-                `Nearby Land usage : ${V('landUsage')}`, ``,
-                `Access to site : ${V('siteAccess')}`, `Distance from Panchayat/PWD road : ${V('distPwd')}`,
-                `Condition of Road : ${V('roadCondition')}`, ``,
-                `Boundaries as per LS :`,
-                `NORTH  : ${V('lsNorth')}`, `SOUTH  : ${V('lsSouth')}`, `EAST      : ${V('lsEast')}`, `WEST     : ${V('lsWest')}`, ``,
-                `Boundaries as per actual site  :`,
-                `NORTH  : ${V('actNorth')}`, `SOUTH  : ${V('actSouth')}`, `EAST      : ${V('actEast')}`, `WEST     : ${V('actWest')}`, ``,
-                `Demarcation : ${V('demarcationDesc')}`,
-                `NORTH  : ${V('demNorth')}`, `SOUTH  : ${V('demSouth')}`, `EAST      : ${V('demEast')}`, `WEST     : ${V('demWest')}`, ``,
-                `Building Details :`, `Age : ${V('age')} years`, `Area of Building : ${V('area')}`,
-                `Number of Floor : ${V('floors')}`, `Roofing : ${V('roofing')}`, `Flooring : ${V('flooring')}`,
-                `Water source : ${V('waterSource')}`, ``,
-                `Land price : Around ${V('landPrice')}`, ``, `Extent   : ${V('extent')}`, `SYNO    : ${V('syno')}`, ``,
-                `Documents given :`,
-                `Deed -              Dated on : ${formatDateDisplay(V('docDeedDate'))}        SRO : ${V('docDeedSro')}`,
-                `LS -              Dated on : ${formatDateDisplay(V('docLsDate'))}`,
-                `LTR  -       Dated on : ${formatDateDisplay(V('docLtrDate'))}`,
-                `Possession -              Dated on : ${formatDateDisplay(V('docPossDate'))}`,
-                `BTR -              Dated on : ${formatDateDisplay(V('docBtrDate'))}`,
-                `EC -                Dated on : ${formatDateDisplay(V('docEcDate'))}`, ``,
-                `Route from : ${V('routeStartPoint')}`,
-                `Route : ${V('routeText')}`, ``, `Remarks & comments : ${V('remarks')}`, ``,
-                `File Recieved on: ${formatDateDisplay(V('fileReceived'))}`,
-                `Report sent : ${formatDateDisplay(V('reportSent'))}`,
-                `Report sent to : ${V('sendToEmail')}`
-            ];
-            G('reportOutput').value = lines.join('\n');
-        }
-        function copyReport() {
-            const r = G('reportOutput'); r.select();
-            navigator.clipboard?.writeText(r.value).catch(() => document.execCommand('copy'));
-            toast('📋 Report copied!');
-        }
-        function collectFormData() {
-            genReport();
-            return {
-                fileNo: G('fileNoDisplay').textContent,
-                bank: V('bankName') === 'Other' ? V('otherBank') : V('bankName'),
-                loan: V('loanType'), applicant: V('applicantName'), owner: V('ownerName'),
-                phone: V('phoneNumber'), taluk: V('taluk'), village: V('villageInput'),
-                fullReport: V('reportOutput'), sendTo: V('sendToEmail')
-            };
-        }
-
-        // ── FIX 1: Security & Submit (No-CORS Integration) ────────────────────────
-        const API_KEY = 'SIF_PRO_2026';
-        function utf8_to_b64(str) { return window.btoa(unescape(encodeURIComponent(str))); }
-
-        async function generateSignature(message, secret) {
-            const enc = new TextEncoder("utf-8");
-            const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: { name: "SHA-256" } }, false, ["sign"]);
-            const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
-            return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        async function sendShieldedData(url, action, rawData) {
-            const js = JSON.stringify({ action, data: rawData });
-            const b64 = utf8_to_b64(js);
-            const sig = await generateSignature(b64, API_KEY);
-
-            // The critical no-cors fix for Google Apps Script
-            const res = await fetch(url, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ payload: b64, signature: sig })
-            });
-            return { status: 'ok' };
-        }
-
-        async function submitWithOfflineSupport() {
-            const url = V('gasUrl');
-            if (!url) return toast('❌ Secure URL missing');
-            if (!V('taluk') || !V('applicantName')) { goTo(1); return toast('⚠ Applicant & Taluk required'); }
-            
-            const btn = G('submitBtn'); 
-            btn.innerHTML = '<span class="spinner"></span> Working…'; 
-            btn.disabled = true;
-            
-            const payload = collectFormData();
-            if (!navigator.onLine) { saveToOfflineQueue(payload); btn.innerHTML = '📤 Encrypt & Send'; btn.disabled = false; return; }
-            
-            try {
-                toast('🔒 Securing & sending…', 3000);
-                const json = await sendShieldedData(url, 'submit', payload);
-                if (json.status === 'ok') {
-                    const b = G('submitResult'); 
-                    b.style.display = 'block';
-                    b.style.borderColor = 'var(--success)'; 
-                    b.style.color = 'var(--success)';
-                    
-                    // 🚀 FIX: Lock the button and provide a clear reset path
-                    btn.innerHTML = '✅ Submitted';
-                    // We intentionally leave btn.disabled = true so they can't click it again
-                    
-                    b.innerHTML = `
-                        ✅ <strong>Secured & Sent!</strong><br>
-                        File: ${payload.fileNo}<br><br>
-                        <button class="btn btn-primary btn-sm" style="width:100%" onclick="resetApp()">Start New Report</button>
-                    `;
-                    
-                    localStorage.removeItem('sif_draft');
-                    await saveToHistory(true);
-                    
-                    // Optional: Automatically open the Dashboard so they see it saved
-                    setTimeout(openDashboard, 1500); 
-                } else throw new Error(json.message);
-            } catch (e) {
-                toast('📡 Network error. Saving offline…', 4000);
-                saveToOfflineQueue(payload);
-                btn.innerHTML = '📤 Encrypt & Send'; 
-                btn.disabled = false;
-            } 
-        }
-       // ── 🔒 TAMPER-EVIDENT OFFLINE QUEUE ──────────────────────────────────────
-        async function saveToOfflineQueue(payload) {
-            let queue = JSON.parse(localStorage.getItem('sif_offline_queue') || '[]');
-            if (!queue.find(i => i.fileNo === payload.fileNo)) { 
-                // Generate a tamper-seal based on the raw data
-                payload._seal = await generateSignature(payload.fileNo + payload.applicant, API_KEY);
-                queue.push(payload); 
-                localStorage.setItem('sif_offline_queue', JSON.stringify(queue)); 
-            }
-            updateQueueUI();
-            const b = G('submitResult'); b.style.display = 'block';
-            b.style.borderColor = 'var(--warn)'; b.style.color = 'var(--warn)';
-            b.innerHTML = `⚠️ <strong>Saved Locally</strong><br>Waiting for network to sync ${payload.fileNo}.`;
-            localStorage.removeItem('sif_draft');
-        }
-
-        async function syncOfflineQueue() {
-            if (!navigator.onLine) return toast('❌ Still offline');
-            let queue = JSON.parse(localStorage.getItem('sif_offline_queue') || '[]');
-            if (!queue.length) return;
-            
-            const btn = G('syncBtn'); btn.innerHTML = '<span class="spinner"></span>'; btn.disabled = true;
-            let successes = [];
-            
-            for (let item of queue) {
-                try { 
-                    // Verify the seal hasn't been broken before sending
-                    const verifySeal = await generateSignature(item.fileNo + item.applicant, API_KEY);
-                    if (item._seal !== verifySeal) {
-                        console.error("Tampering detected on file:", item.fileNo);
-                        toast(`🚨 Tampering detected on ${item.fileNo}. Sync rejected.`);
-                        continue; // Skip this tampered file
-                    }
-                    
-                    const r = await sendShieldedData(V('gasUrl'), 'submit', item); 
-                    if (r.status === 'ok') successes.push(item.fileNo); 
-                } catch (e) { }
-            }
-            queue = queue.filter(i => !successes.includes(i.fileNo));
-            localStorage.setItem('sif_offline_queue', JSON.stringify(queue));
-            updateQueueUI(); btn.innerHTML = '🔄 Sync'; btn.disabled = false;
-            if (successes.length) toast(`✅ Synced ${successes.length} item(s)!`, 4000);
-        }
-      
-
-        function updateQueueUI() {
-            let queue = JSON.parse(localStorage.getItem('sif_offline_queue') || '[]');
-            const panel = G('offlineQueuePanel');
-            if (queue.length) {
-                panel.style.display = 'block'; G('queueCount').textContent = queue.length;
-                G('queueList').innerHTML = queue.map(i => `• ${i.fileNo} (${i.applicant})`).join('<br>');
-            } else { panel.style.display = 'none'; }
-        }
-
-        // ── Boundary Copy Helpers ─────────────────────────────────────────────────────
-        const DIRS = ['North', 'South', 'East', 'West'];
-        function copyBounds(from, to) {
-            DIRS.forEach(d => {
-                const src = G(from + d); const dst = G(to + d);
-                if (src && dst) dst.value = src.value;
-            });
-            saveDraft();
-            toast(`✅ Copied to ${to === 'act' ? 'Actual' : 'Demarcation'}!`);
-        }
-
-        // ── IndexedDB Photo Engine (50MB+ vs 5MB localStorage) ─────────────────────
-        let sitePhotos = []; // In-memory cache, backed by IndexedDB
-        let _photoDB = null;
-
-        function openPhotoDB() {
-            return new Promise((resolve, reject) => {
-                if (_photoDB) return resolve(_photoDB);
-                const req = indexedDB.open('SIF_Photos', 1);
-                req.onupgradeneeded = (e) => {
-                    e.target.result.createObjectStore('photos', { keyPath: 'id' });
-                };
-                req.onsuccess = (e) => { _photoDB = e.target.result; resolve(_photoDB); };
-                req.onerror = () => reject('IndexedDB unavailable');
-            });
-        }
-
-        async function savePhotoToDB(photo) {
-            const db = await openPhotoDB();
-            return new Promise((resolve) => {
-                const tx = db.transaction('photos', 'readwrite');
-                tx.objectStore('photos').put(photo);
-                tx.oncomplete = resolve;
-            });
-        }
-
-        async function deletePhotoFromDB(id) {
-            const db = await openPhotoDB();
-            return new Promise((resolve) => {
-                const tx = db.transaction('photos', 'readwrite');
-                tx.objectStore('photos').delete(id);
-                tx.oncomplete = resolve;
-            });
-        }
-
-        async function loadPhotosFromDB() {
-            try {
-                const db = await openPhotoDB();
-                return new Promise((resolve) => {
-                    const tx = db.transaction('photos', 'readonly');
-                    const req = tx.objectStore('photos').getAll();
-                    req.onsuccess = () => { sitePhotos = req.result || []; resolve(); };
-                    req.onerror = () => { sitePhotos = []; resolve(); };
-                });
-            } catch (e) { sitePhotos = []; }
-        }
-
-        // ── DATE FRAUD PREVENTION ─────────────────────────────────────────────────
-        function lockDateInputs() {
-            const today = new Date().toISOString().split('T')[0];
-            ['fileReceived', 'reportSent'].forEach(id => {
-                const el = G(id);
-                if (!el) return;
-                el.setAttribute('max', today);
-                el.addEventListener('change', function () {
-                    if (this.value > today) {
-                        this.value = today;
-                        toast('⚠ Future dates not allowed — locked to today');
-                    }
-                });
-            });
-        }
-
-        // ── GPS STATUS BAR (photo step) ───────────────────────────────────────────
-        function updatePhotoGpsBar() {
-            const coords = V('locationCoords');
-            const bar = G('photoGpsBar');
-            if (!bar) return;
-            if (coords && coords !== 'GPS NOT LOCKED') {
-                G('photoGpsIcon').textContent = '✅';
-                G('photoGpsText').textContent = 'GPS locked — watermark will include coordinates';
-                G('photoGpsCoords').textContent = coords;
-                bar.style.borderColor = 'rgba(16,185,129,0.4)';
-                bar.style.background = 'rgba(16,185,129,0.05)';
-            } else {
-                G('photoGpsIcon').textContent = '⚠️';
-                G('photoGpsText').textContent = 'GPS not locked — go to Step 4 first';
-                G('photoGpsCoords').textContent = '';
-                bar.style.borderColor = 'rgba(245,158,11,0.4)';
-                bar.style.background = 'rgba(245,158,11,0.05)';
-            }
-        }
-
-        // ── FIX 3: VERIFIED WATERMARK CAPTURE (With robust fallback) ──────────────
-        /let _retakeTargetId = null;
-
-       /*- async function handleCapture(input, retakeId = null) {
-            if (!input.files?.[0]) return;
-            const file = input.files[0];
-            const label = G('photoLabel').value;
-            const coords = V('locationCoords') || 'GPS NOT LOCKED';
-            const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-
-            // FIX: Robust short address fallback
-            const shortAddr = _lastReverseAddress || V('address').split('\n')[0] || V('locality') || coords;
-
-            toast('✍️ Stamping verification data…');
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                const img = new Image();
-                img.onload = async function () {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    const scale = 1200 / img.width;
-                    canvas.width = 1200;
-                    canvas.height = img.height * scale;
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                    const barH = 100;
-                    ctx.fillStyle = 'rgba(0,0,0,0.72)';
-                    ctx.fillRect(0, canvas.height - barH, canvas.width, barH);
-
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 26px Arial, sans-serif';
-                    ctx.fillText(label.toUpperCase(), 20, canvas.height - barH + 30);
-
-                    ctx.fillStyle = '#7dd3fc';
-                    ctx.font = '17px Courier New, monospace';
-                    const coordLine = coords !== 'GPS NOT LOCKED' ? `📍 ${coords}` : '⚠ GPS NOT LOCKED';
-                    ctx.fillText(coordLine, 20, canvas.height - barH + 55);
-
-                    ctx.fillStyle = '#cbd5e1';
-                    ctx.font = '15px Courier New, monospace';
-                    const addrShort = shortAddr.length > 55 ? shortAddr.substring(0, 55) + '…' : shortAddr;
-                    ctx.fillText(`${addrShort}  |  ${timestamp}`, 20, canvas.height - barH + 80);
-
-                    ctx.fillStyle = coords !== 'GPS NOT LOCKED' ? 'rgba(16,185,129,0.85)' : 'rgba(239,68,68,0.85)';
-                    ctx.fillRect(canvas.width - 160, 12, 148, 28);
-                    ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 14px Arial, sans-serif';
-                    ctx.fillText(coords !== 'GPS NOT LOCKED' ? '✓ SIF VERIFIED' : '✗ NO GPS', canvas.width - 152, 31);
-
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-                    const photo = {
-                        id: retakeId || Date.now(),
-                        data: dataUrl,
-                        label,
-                        coords,
-                        address: shortAddr,
-                        timestamp,
-                        hasGps: coords !== 'GPS NOT LOCKED'
-                    };
-
-                    if (retakeId) {
-                        const idx = sitePhotos.findIndex(p => p.id === retakeId);
-                        if (idx !== -1) sitePhotos[idx] = photo;
-                        else sitePhotos.push(photo);
-                    } else {
-                        sitePhotos.push(photo);
-                    }
-                    await savePhotoToDB(photo);
-                    renderGallery();
-                    input.value = '';
-                    _retakeTargetId = null;
-                    toast(coords !== 'GPS NOT LOCKED' ? '✅ Verified & GPS-stamped' : '⚠ Saved — GPS was not locked!');
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        async function handleRetake(input) {
-            if (!_retakeTargetId) return;
-            await handleCapture(input, _retakeTargetId);
-        }                */
-
-            // ═══════════════════════════════════════════════════════════════════════════════
-// UPGRADED PROFESSIONAL PHOTO ENGINE (Canvas Watermarking)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-async function handleCapture(input, retakeId = null) {
-    if (!input.files?.[0]) return;
-    const file = input.files[0];
-    const label = G('photoLabel').value;
-    
-    // Parse GPS Coords properly
-    const coordsStr = V('locationCoords') || 'GPS NOT LOCKED';
-    let latLonStr = coordsStr;
-    if(coordsStr !== 'GPS NOT LOCKED' && coordsStr.includes(',')){
-        const pts = coordsStr.split(',').map(p => p.trim());
-        latLonStr = `Lat ${pts[0]}° / Lon ${pts[1]}°`;
-    }
-
-    // Get timestamp with GMT offset (India standard, matching your examples)
-    const rawDate = new Date();
-    const timestamp = rawDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
-    
-    // Intelligently split the address (assuming lastReverseAddress is comma-separated)
-    const shortAddr = lastReverseAddress || V('address').split('\n')[0] || V('locality') || coordsStr;
-    const addrLines = shortAddr.split(', ').slice(0, 3); // Grab top 3 parts (Village, District, PIN)
-
-    toast('✍️ Stamping professional verification…');
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const img = new Image();
-        img.onload = async () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Set Standard Professional Output Res (Standard 4:3 ratio matching standard phone cameras)
-            const targetW = 1200; 
-            const scale = targetW / img.width;
-            canvas.width = targetW;
-            canvas.height = img.height * scale;
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-            // --- REDESIGN: Transparent Professional Overlay ---
-            // Stop using solid bars. Place structured text directly on image.
-            
-            // Layout Settings (Matching target example structure)
-            const marginLeft = 40; // Indent from left
-            const marginBottom = 40; // Indent from bottom
-            const yBase = canvas.height - marginBottom;
-            
-            // Font Definitions (Ensure Sora/DM Mono from head are used)
-            const soraMain = 'bold 30px Sora, sans-serif';       // DateTime prominent
-            const dmMonoSub = '500 18px "DM Mono", monospace'; // Lat/Lon specific
-            const soraAddr = '500 18px Sora, sans-serif';       // Address structured
-
-            // Set Text Shadow for high contrast on any photo background
-            ctx.shadowColor = 'rgba(0,0,0,0.85)'; // Dark soft shadow
-            ctx.shadowBlur = 10;
-            ctx.shadowOffsetX = 2;
-            ctx.shadowOffsetY = 2;
-            ctx.fillStyle = '#ffffff'; // White professional text
-            ctx.textAlign = 'left';
-
-            // We build the layout from the bottom up.
-            const lineHeight = 34; // spacing between lines
-            let yCursor = yBase;
-
-            // Lines 3-5: ADDRESS (STRUCTURED)
-            ctx.font = soraAddr;
-            for(let j=Math.min(3, addrLines.length)-1; j>=0; j--){
-                ctx.fillText(addrLines[j].trim(), marginLeft, yCursor);
-                yCursor -= lineHeight;
-            }
-            yCursor -= 10; // Extra gap before location
-
-            // Line 2: COMPASS + LAT / LON
-            ctx.font = dmMonoSub;
-            drawCompassIcon(ctx, marginLeft + 15, yCursor - 10, 32); // Icon centered vertically
-            ctx.fillText(latLonStr, marginLeft + 50, yCursor); // Text following icon
-            yCursor -= (lineHeight + 30); // Gap before DateTime prominence
-
-            // Line 1: DATE / TIME (PROMINTENT LIKE EXAMPLE)
-            ctx.font = soraMain;
-            // Replicate GMT+5:30 suffix common in inspection apps
-            ctx.fillText(timestamp.toUpperCase() + ' (GMT+5:30)', marginLeft, yCursor);
-
-            // Subtle branded footer (bottom right, subtle gray)
-            ctx.font = '500 20px Sora, sans-serif';
-            ctx.fillStyle = 'rgba(255,255,255,0.7)'; // 70% opacity white
-            ctx.textAlign = 'right';
-            ctx.shadowBlur = 4; // Lighter shadow
-            ctx.fillText(`SIF Modular App | ${label.toUpperCase()}`, canvas.width - 40, canvas.height - 20);
-
-            // Finalizing image
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-            const photo = {
-                id: retakeId || Date.now(),
-                data: dataUrl,
-                label,
-                coords,
-                address: shortAddr,
-                timestamp,
-                hasGps: coords !== 'GPS NOT LOCKED'
-            };
-
-            await savePhotoToDB(photo);
-            window.sitePhotos = await loadPhotosFromDB();
-            renderGallery();
-            input.value = '';
-            toast('✅ Professional Photo Saved');
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-}
-
-// Helper to draw a static professional compass icon using Canvas pathing
-function drawCompassIcon(ctx, x, y, size) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.beginPath();
-    
-    // Outer Circle (White outline)
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = '#ffffff';
-    ctx.arc(0, 0, size/2, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Red North Needle
-    ctx.beginPath();
-    ctx.fillStyle = '#ea4335'; // Red North indicator
-    ctx.moveTo(0, -(size/2) + 2); // Tip
-    ctx.lineTo(-size/6, -1); // Bottom left
-    ctx.lineTo(size/6, -1); // Bottom right
-    ctx.closePath();
-    ctx.fill();
-
-    // White South Needle
-    ctx.beginPath();
-    ctx.fillStyle = '#ffffff';
-    ctx.moveTo(0, (size/2) - 2); // Tip
-    ctx.lineTo(-size/6, 1); // Top left
-    ctx.lineTo(size/6, 1); // Top right
-    ctx.closePath();
-    ctx.fill();
-    
-    ctx.restore();
-}
-        // ── GALLERY RENDER ────────────────────────────────────────────────────────
-        function renderGallery() {
-            const container = G('photoGallery');
-            const empty = G('photoEmpty');
-            if (!sitePhotos.length) {
-                container.innerHTML = '';
-                if (empty) empty.style.display = 'block';
-                return;
-            }
-            if (empty) empty.style.display = 'none';
-
-            container.innerHTML = sitePhotos.map((p, i) => {
-                const gpsOk = p.hasGps !== false;
-                const stamp = gpsOk
-                    ? `<div class="verify-stamp">✓ GPS</div>`
-                    : `<div class="verify-stamp no-gps-stamp">⚠ No GPS</div>`;
-                return `
-                <div class="photo-tile" id="pt-${p.id}">
-                    <img class="thumb" src="${p.data}" onclick="openLightbox(${i})" loading="lazy">
-                    ${stamp}
-                    <div class="tile-footer">
-                        <span class="tile-label">${p.label}</span>
-                        <div class="tile-btns">
-                            <button class="tile-btn" onclick="openLightbox(${i})" title="View full image">🔍</button>
-                            <button class="tile-btn" onclick="openLightbox(${i}); lbRetakeMode()" title="Retake">🔄</button>
-                            <button class="tile-btn danger" onclick="removePhoto(${p.id})" title="Delete">✕</button>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        async function removePhoto(id) {
-            if (!confirm('Delete this photo?')) return;
-            sitePhotos = sitePhotos.filter(p => p.id !== id);
-            await deletePhotoFromDB(id);
-            renderGallery();
-            toast('🗑 Photo deleted');
-        }
-
-        async function renamePhoto(id) {
-            const photo = sitePhotos.find(p => p.id === id);
-            if (!photo) return;
-            const newName = prompt('Rename this photo:', photo.label);
-            if (newName && newName.trim()) {
-                photo.label = newName.trim();
-                await savePhotoToDB(photo);
-                renderGallery();
-                toast('✅ Label updated');
-            }
-        }
-
-        // ── LIGHTBOX ENGINE ───────────────────────────────────────────────────────
-        let _lbIndex = 0;
-
-        function openLightbox(idx) {
-            if (!sitePhotos.length) return;
-            _lbIndex = Math.max(0, Math.min(idx, sitePhotos.length - 1));
-            renderLightbox();
-            G('photoLightbox').classList.add('open');
-        }
-
-        function closeLightbox() {
-            G('photoLightbox').classList.remove('open');
-        }
-
-        function lbNav(dir) {
-            _lbIndex = (_lbIndex + dir + sitePhotos.length) % sitePhotos.length;
-            renderLightbox();
-        }
-
-        function renderLightbox() {
-            const p = sitePhotos[_lbIndex];
-            if (!p) return;
-            G('lbImage').src = p.data;
-            G('lbLabel').textContent = p.label;
-            G('lbCounter').textContent = `${_lbIndex + 1} of ${sitePhotos.length}`;
-
-            // Nav button visibility
-            G('lbPrev').style.display = sitePhotos.length > 1 ? 'flex' : 'none';
-            G('lbNext').style.display = sitePhotos.length > 1 ? 'flex' : 'none';
-
-            // Verification panel
-            const gpsOk = p.hasGps !== false;
-            G('lbGpsIcon').textContent = gpsOk ? '✅' : '⚠️';
-            G('lbGpsText').textContent = p.coords || 'Not recorded';
-            G('lbGpsText').className = 'lb-verify-text ' + (gpsOk ? 'lb-verify-ok' : 'lb-verify-fail');
-
-            G('lbAddrText').textContent = p.address || 'Address not recorded';
-            G('lbTimeText').textContent = p.timestamp || 'Timestamp not recorded';
-
-            const burnOk = p.coords && p.timestamp;
-            G('lbBurnStatus').textContent = burnOk ? 'Watermark permanently burned into image ✓' : '⚠ Incomplete watermark — consider retaking';
-            G('lbBurnStatus').className = 'lb-verify-text ' + (burnOk ? 'lb-verify-ok' : 'lb-verify-fail');
-        }
-
-        function lbRetake() {
-            const p = sitePhotos[_lbIndex];
-            if (!p) return;
-            _retakeTargetId = p.id;
-            G('photoLabel').value = p.label; // keep same label
-            G('retakeInput').click();
-            closeLightbox();
-        }
-
-        function lbRetakeMode() {
-            // Called from gallery tile retake button — lightbox already open
-        }
-
-        async function lbRename() {
-            const p = sitePhotos[_lbIndex];
-            if (!p) return;
-            const newName = prompt('Rename this photo:', p.label);
-            if (newName && newName.trim()) {
-                p.label = newName.trim();
-                await savePhotoToDB(p);
-                renderGallery();
-                renderLightbox();
-                toast('✅ Label updated');
-            }
-        }
-
-        async function lbDelete() {
-            const p = sitePhotos[_lbIndex];
-            if (!p || !confirm('Delete this photo?')) return;
-            await deletePhotoFromDB(p.id);
-            sitePhotos = sitePhotos.filter(x => x.id !== p.id);
-            renderGallery();
-            if (!sitePhotos.length) { closeLightbox(); return; }
-            _lbIndex = Math.min(_lbIndex, sitePhotos.length - 1);
-            renderLightbox();
-            toast('🗑 Photo deleted');
-        }
-
-        // Swipe navigation in lightbox
-        let _lbTouchX = 0;
-        G('photoLightbox').addEventListener('touchstart', e => { _lbTouchX = e.touches[0].clientX; }, { passive: true });
-        G('photoLightbox').addEventListener('touchend', e => {
-            const dx = e.changedTouches[0].clientX - _lbTouchX;
-            if (Math.abs(dx) > 50) lbNav(dx < 0 ? 1 : -1);
-        }, { passive: true });
-        // Close on backdrop click (not on image/buttons)
-        G('photoLightbox').addEventListener('click', e => {
-            if (e.target === G('photoLightbox') || e.target === G('lbImage')) closeLightbox();
-        });
-
-        // ── Auto-Advance: dropdown change + Enter key on inputs/selects ─────────
-        document.querySelectorAll('.field select').forEach(sel => {
-            sel.addEventListener('change', () => {
-                const allFields = [...document.querySelectorAll('.section.active input, .section.active select, .section.active textarea')];
-                const idx = allFields.indexOf(sel);
-                for (let i = idx + 1; i < allFields.length; i++) {
-                    if (!allFields[i].value || allFields[i].value === '') {
-                        allFields[i].focus(); break;
-                    }
-                }
-            });
-        });
-        // Enter key → jump to next field (skip textareas so Enter still adds new lines there)
-        document.addEventListener('keydown', e => {
-            if (e.key !== 'Enter') return;
-            const el = e.target;
-            if (el.tagName === 'TEXTAREA') return; // Let Enter work normally in textareas
-            if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-                e.preventDefault();
-                const allFields = [...document.querySelectorAll('.section.active input, .section.active select, .section.active textarea')];
-                const idx = allFields.indexOf(el);
-                if (idx >= 0 && idx < allFields.length - 1) {
-                    allFields[idx + 1].focus();
-                }
-            }
-        });
-
-        // ── Hide Voice Buttons on unsupported browsers ────────────────────────────
-        if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-            document.querySelectorAll('.btn-mic').forEach(b => b.style.display = 'none');
-        }
-
-        // ── Dynamic Form Generation: Boundaries ────────────────────────────────────
-        const BND_DIRS = [
-            { label: 'N', key: 'North', desc: 'North boundary' },
-            { label: 'S', key: 'South', desc: 'South boundary' },
-            { label: 'E', key: 'East', desc: 'East boundary' },
-            { label: 'W', key: 'West', desc: 'West boundary' }
-        ];
-        ['ls', 'act', 'dem'].forEach(type => {
-            const container = G(`${type}BoundariesContainer`);
-            if (container) {
-                container.innerHTML = BND_DIRS.map(d => `
-                    <tr>
-                        <td>${d.label}</td>
-                        <td><input id="${type}${d.key}" ${type !== 'dem' ? `placeholder="${d.desc}"` : ''}></td>
-                    </tr>
-                `).join('');
-            }
-        });
-
-        // ── DASHBOARD ENGINE ──────────────────────────────────────────────────────────
-        const HISTORY_TTL = 24 * 60 * 60 * 1000; // 24 hours in ms
-
-        // Open (or reuse) the history store inside the same SIF_Photos DB
-        function openHistoryDB() {
-            return new Promise((resolve, reject) => {
-                const req = indexedDB.open('SIF_History', 1);
-                req.onupgradeneeded = (e) => {
-                    e.target.result.createObjectStore('reports', { keyPath: 'id' });
-                };
-                req.onsuccess = (e) => resolve(e.target.result);
-                req.onerror = () => reject('HistoryDB unavailable');
-            });
-        }
-
-        async function getAllHistory() {
-            try {
-                const db = await openHistoryDB();
-                return new Promise((resolve) => {
-                    const tx = db.transaction('reports', 'readonly');
-                    const req = tx.objectStore('reports').getAll();
-                    req.onsuccess = () => resolve(req.result || []);
-                    req.onerror = () => resolve([]);
-                });
-            } catch { return []; }
-        }
-
-        async function saveHistoryEntry(entry) {
-            const db = await openHistoryDB();
-            return new Promise((resolve) => {
-                const tx = db.transaction('reports', 'readwrite');
-                tx.objectStore('reports').put(entry);
-                tx.oncomplete = resolve;
-            });
-        }
-
-        async function deleteHistoryEntry(id) {
-            const db = await openHistoryDB();
-            return new Promise((resolve) => {
-                const tx = db.transaction('reports', 'readwrite');
-                tx.objectStore('reports').delete(id);
-                tx.oncomplete = resolve;
-            });
-        }
-
-        async function purgeExpired() {
-            const all = await getAllHistory();
-            const now = Date.now();
-            const expired = all.filter(e => !e.sentToBackend && (now - e.createdAt) >= HISTORY_TTL);
-            for (const e of expired) await deleteHistoryEntry(e.id);
-            if (expired.length) toast(`🧹 Removed ${expired.length} expired report(s)`);
-        }
-
-        // Build a history snapshot from current form state + photos
-        async function saveToHistory(markSynced = false) {
-            genReport();
-            const bank = V('bankName') === 'Other' ? V('otherBank') : V('bankName');
-            const applicant = V('applicantName');
-            if (!applicant && !bank) return toast('⚠ Fill in at least Applicant or Bank first');
-
-            // Pull thumbnail URLs from current sitePhotos (first 6)
-            const thumbs = sitePhotos.slice(0, 6).map(p => ({ data: p.data, label: p.label }));
-
-            const fileNo = G('fileNoDisplay').textContent !== '—'
-                ? G('fileNoDisplay').textContent
-                : `SIF-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 1).padStart(3, '0')}`;
-
-            if (G('fileNoDisplay').textContent === '—') G('fileNoDisplay').textContent = fileNo;
-
-            const entry = {
-                id: Date.now(),
-                fileNo,
-                createdAt: Date.now(),
-                sentToBackend: markSynced,
-                applicant: applicant || '—',
-                owner: V('ownerName') || '—',
-                bank: bank || '—',
-                loan: V('loanType') || '—',
-                taluk: V('taluk') || '—',
-                coords: V('locationCoords') || '',
-                photoCount: sitePhotos.length,
-                thumbs,
-                report: V('reportOutput') || ''
-            };
-
-            await saveHistoryEntry(entry);
-            toast(markSynced ? '✅ Synced & saved to history' : '🗂 Saved to history (expires in 24h)');
-            return entry;
-        }
-
-        // ── Dashboard open/close ──────────────────────────────────────────────────────
-        function openDashboard() {
-            purgeExpired().then(() => renderDashboard());
-            G('dashboardOverlay').classList.add('open');
-        }
-        function closeDashboard() {
-            G('dashboardOverlay').classList.remove('open');
-        }
-        // Swipe-right-to-close on touch
-        let _touchStartX = 0;
-        G('dashboardOverlay').addEventListener('touchstart', e => { _touchStartX = e.touches[0].clientX; }, { passive: true });
-        G('dashboardOverlay').addEventListener('touchend', e => {
-            if (e.changedTouches[0].clientX - _touchStartX > 80) closeDashboard();
-        }, { passive: true });
-
-        function expiryInfo(entry) {
-            if (entry.sentToBackend) return { pct: 100, label: 'Synced to backend', color: '#34d399', urgent: false };
-            const age = Date.now() - entry.createdAt;
-            const pct = Math.min(100, (age / HISTORY_TTL) * 100);
-            const remaining = HISTORY_TTL - age;
-            const hrs = Math.floor(remaining / 3600000);
-            const mins = Math.floor((remaining % 3600000) / 60000);
-            const label = remaining <= 0 ? 'Expired' : hrs > 0 ? `${hrs}h ${mins}m left` : `${mins}m left`;
-            const color = pct > 85 ? '#f87171' : pct > 60 ? '#fbbf24' : '#3b82f6';
-            return { pct, label, color, urgent: pct > 85 };
-        }
-
-        async function renderDashboard() {
-            const all = await getAllHistory();
-            const q = (G('dashSearch')?.value || '').toLowerCase().trim();
-            const now = Date.now();
-
-            // Filter out truly expired unsent ones for display purposes
-            const visible = all
-                .filter(e => e.sentToBackend || (now - e.createdAt) < HISTORY_TTL)
-                .filter(e => !q || [e.fileNo, e.applicant, e.bank, e.taluk, e.owner].some(v => v.toLowerCase().includes(q)))
-                .sort((a, b) => b.createdAt - a.createdAt);
-
-            // Stats
-            G('dStatTotal').textContent = visible.length;
-            G('dStatSynced').textContent = visible.filter(e => e.sentToBackend).length;
-            G('dStatExpiring').textContent = visible.filter(e => !e.sentToBackend && (now - e.createdAt) > HISTORY_TTL * 0.6).length;
-
-            const body = G('dashBody');
-            if (!visible.length) {
-                body.innerHTML = `<div class="dash-empty"><div class="icon">📂</div><p>${q ? 'No results for "<strong>' + q + '</strong>".' : 'No saved reports yet.<br>Complete a report and tap <strong>🗂 Save to History</strong>.'}</p></div>`;
-                return;
-            }
-
-            body.innerHTML = visible.map(entry => {
-                const ei = expiryInfo(entry);
-                const date = new Date(entry.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-                const cardClass = entry.sentToBackend ? 'synced' : ei.urgent ? 'expiring-soon' : '';
-
-                const photosHtml = entry.thumbs.length
-                    ? entry.thumbs.map(t => `<img src="${t.data}" title="${t.label}" loading="lazy">`).join('')
-                    + (entry.photoCount > 6 ? `<div class="rc-photo-count">+${entry.photoCount - 6}<br>more</div>` : '')
-                    : `<div class="rc-photo-count" style="width:100%; text-align:center; padding:8px; font-size:0.7rem; color:var(--text-3);">No photos</div>`;
-
-                const syncBadge = entry.sentToBackend
-                    ? `<span class="badge badge-synced">✓ Synced</span>`
-                    : ei.urgent
-                        ? `<span class="badge badge-expiring">⚡ Expiring</span>`
-                        : `<span class="badge badge-local">⏳ Local</span>`;
-
-                return `
-                <div class="report-card ${cardClass}" id="rc-${entry.id}">
-                    <div class="rc-header" onclick="toggleCard(${entry.id})">
-                        <div class="rc-meta">
-                            <div class="rc-fileno">${entry.fileNo}</div>
-                            <div class="rc-name">${entry.applicant}</div>
-                            <div class="rc-bank">${entry.bank} · ${entry.loan} · ${entry.taluk}</div>
-                        </div>
-                        <div class="rc-badges">
-                            ${syncBadge}
-                            <span class="badge badge-expire-ok" style="font-size:0.55rem;">${date}</span>
-                        </div>
-                    </div>
-                    <div class="rc-photos">${photosHtml}</div>
-                    <div class="rc-expiry-bar">
-                        <div class="expiry-track"><div class="expiry-fill" style="width:${ei.pct}%; background:${ei.color};"></div></div>
-                        <div class="expiry-label"><span>${entry.sentToBackend ? '☁️ Secured in backend' : '🕐 Auto-deletes in'}</span><span style="color:${ei.color}; font-weight:600;">${ei.label}</span></div>
-                    </div>
-                    <div class="rc-body" id="rcb-${entry.id}">
-                        <pre class="rc-report-text">${entry.report || '(no report text)'}</pre>
-                        <div class="rc-actions">
-                            <button class="btn btn-primary btn-sm" onclick="loadEntryIntoForm(${entry.id})">📝 Load into Form</button>
-                            <button class="btn btn-secondary btn-sm" onclick="copyEntryReport(${entry.id})">📋 Copy Report</button>
-                            ${!entry.sentToBackend ? `<button class="btn btn-secondary btn-sm" onclick="markSyncedManually(${entry.id})" style="color:#34d399; border-color:rgba(16,185,129,0.3);">☁️ Mark Synced</button>` : ''}
-                            <button class="btn btn-secondary btn-sm" onclick="deleteEntry(${entry.id})" style="color:var(--danger); border-color:rgba(239,68,68,0.3); margin-left:auto;">🗑 Delete</button>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        function toggleCard(id) {
-            const body = G(`rcb-${id}`);
-            if (body) body.classList.toggle('open');
-        }
-
-        async function deleteEntry(id) {
-            if (!confirm('Delete this history entry?')) return;
-            await deleteHistoryEntry(id);
-            renderDashboard();
-            toast('🗑 Deleted');
-        }
-
-        async function markSyncedManually(id) {
-            const all = await getAllHistory();
-            const entry = all.find(e => e.id === id);
-            if (!entry) return;
-            entry.sentToBackend = true;
-            await saveHistoryEntry(entry);
-            renderDashboard();
-            toast('☁️ Marked as synced — will not auto-delete');
-        }
-
-        function copyEntryReport(id) {
-            getAllHistory().then(all => {
-                const entry = all.find(e => e.id === id);
-                if (!entry) return;
-                navigator.clipboard?.writeText(entry.report).catch(() => { });
-                toast('📋 Report copied!');
-            });
-        }
-
-        async function loadEntryIntoForm(id) {
-            if (!confirm('Load this report into the form? Unsaved draft will be overwritten.')) return;
-            const all = await getAllHistory();
-            const entry = all.find(e => e.id === id);
-            if (!entry) return;
-
-            // Map entry fields back to form fields
-            const map = {
-                applicantName: entry.applicant, ownerName: entry.owner,
-                bankName: entry.bank, loanType: entry.loan, taluk: entry.taluk
-            };
-            Object.entries(map).forEach(([id, val]) => { if (G(id)) G(id).value = val; });
-            saveDraft();
-            closeDashboard();
-            goTo(0);
-            toast('📝 Loaded into form — verify all fields');
-        }
-
-        // Hook into successful backend submit to auto-save with sentToBackend=true
-        const _origSubmit = submitWithOfflineSupport;
-        submitWithOfflineSupport = async function () {
-            // Capture result by watching submitResult element change after call
-            await _origSubmit();
-            const resultEl = G('submitResult');
-            if (resultEl && resultEl.innerHTML.includes('Secured & Sent')) {
-                await saveToHistory(true);
-            }
-        };
-
-        // Auto-purge on page load (silent)
-        setTimeout(purgeExpired, 2000);
-
-        // ── Boot: load photos from IndexedDB then build nav ───────────────────────
-        loadPhotosFromDB().then(() => { buildNav(); renderGallery(); lockDateInputs(); });
-
-        // ── 📥 INBOX ENGINE ──────────────────────────────────────────────────────
-        
-        // Let's assume this agent is assigned "AGT-01". You can make this dynamic later!
-        const CURRENT_AGENT_ID = 'AGT-01'; 
-        let currentAssignedCaseId = null;
-
-        async function fetchInbox() {
-            const url = V('gasUrl');
-            if (!url) return;
-            
-            const mailList = G('mailList');
-            mailList.innerHTML = '<div style="padding: 30px; text-align: center; color: var(--text-2);">Syncing secure tunnel...</div>';
-
-            try {
-                // Securely ask the server for AGT-01's cases
-                const response = await sendShieldedData(url, 'fetch_cases', { agentId: CURRENT_AGENT_ID });
-                
-                if (response.status === 'ok' && response.cases.length > 0) {
-                    mailList.innerHTML = ''; // Clear loading text
-                    
-                    response.cases.forEach(c => {
-                        const bankName = c['Bank'] || 'Unknown Bank';
-                        const firstLetter = bankName.charAt(0).toUpperCase();
-                        
-                        // Pick a color based on the letter so it looks exactly like Gmail!
-                        const colors = ['#ea4335', '#34a853', '#fbbc05', '#4285f4', '#8e24aa', '#e67c73'];
-                        const bgColor = colors[firstLetter.charCodeAt(0) % colors.length];
-
-                        const mailHTML = `
-                            <div class="mail-item" onclick='openAssignedCase(${JSON.stringify(c).replace(/'/g, "&#39;")})'>
-                                <div class="mail-avatar" style="background: ${bgColor};">${firstLetter}</div>
-                                <div class="mail-content">
-                                    <div class="mail-top">
-                                        <div class="mail-sender">${bankName}</div>
-                                        <div class="mail-status">${c['Status'] || 'New'}</div>
-                                    </div>
-                                    <div class="mail-subject">${c['Applicant']} — ${c['Taluk']}</div>
-                                    <div class="mail-snippet">📞 ${c['Phone'] || 'No phone'} · ${c['Notes'] ? 'Manager: ' + c['Notes'] : 'Standard Valuation'}</div>
-                                </div>
-                            </div>
-                        `;
-                        mailList.insertAdjacentHTML('beforeend', mailHTML);
-                    });
-                } else {
-                    mailList.innerHTML = `
-                        <div style="padding: 40px 20px; text-align: center; color: var(--text-2);">
-                            <div style="font-size: 3rem; margin-bottom: 10px;">🎉</div>
-                            <h3>You're all caught up!</h3>
-                            <p style="font-size: 0.85rem; margin-top: 5px;">No pending files assigned to you.</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                mailList.innerHTML = '<div style="padding: 30px; text-align: center; color: #ef4444;">📡 Secure connection failed. Are you offline?</div>';
-            }
-        }
-
-        function openAssignedCase(caseData) {
-            // Hide Inbox, Show Form
-            G('inboxView').style.display = 'none';
-            G('appContainer').style.display = 'block';
-            
-            // Pre-fill the form so the agent doesn't have to type it!
-            currentAssignedCaseId = caseData['Case ID'];
-            G('bankName').value = caseData['Bank'] || '';
-            G('applicantName').value = caseData['Applicant'] || '';
-            G('applicantPhone').value = caseData['Phone'] || '';
-            G('taluk').value = caseData['Taluk'] || '';
-            
-            // Update status on the server to 'In Progress'
-            updateCaseStatusOnServer(currentAssignedCaseId, 'In Progress', 'Agent started inspection');
-            
-            toast('Case loaded securely.');
-        }
-
-        function startNewBlankReport() {
-            // For walk-ins or unassigned cases
-            currentAssignedCaseId = null; 
-            G('inboxView').style.display = 'none';
-            G('appContainer').style.display = 'block';
-            resetApp(); // Clear any old data
-        }
-
-        async function updateCaseStatusOnServer(caseId, status, note) {
-            const url = V('gasUrl');
-            if (navigator.onLine && url) {
-                // Send secure update silently in the background
-                sendShieldedData(url, 'update_status', { caseId: caseId, newStatus: status, note: note });
-            }
-        }
-
-        // Auto-fetch inbox when the app loads
-        window.addEventListener('load', () => {
-            if(G('inboxView').style.display !== 'none') {
-                fetchInbox();
-            }
-        });
-    </script>
+<script src="js/data.js"></script>
+<script src="js/api.js"></script>
+<script src="js/location.js"></script>
+<script src="js/photoEngine.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>       
 </body>
-
 </html>
