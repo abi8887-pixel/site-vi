@@ -317,7 +317,8 @@ async function copyReport() {
 
 async function shareReport() {
     const text = document.getElementById('finalReportText').value;
-    const applicant = document.getElementById('applicantName')?.value || 'Client';
+    const appInput = document.getElementById('applicantName');
+    const applicant = (appInput ? appInput.value : null) || 'Client';
     
     if (navigator.share) {
         try {
