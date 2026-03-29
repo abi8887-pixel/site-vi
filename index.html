@@ -7,7 +7,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&family=Sora:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
@@ -37,38 +37,103 @@
         </div>
     </div>
 
-    <!-- ═══ HEADER ═══ -->
-    <header>
-        <div class="header-left">
-            <div class="logo-mark"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
-            <div>
-                <div class="app-title">SIF MODULAR</div>
-                <div class="app-subtitle">Field Inspection Pro</div>
+    <!-- ═══ REPORT OVERLAY ═══ -->
+    <div id="reportOverlay" class="login-overlay">
+        <div class="login-card" style="max-width: 500px; width: 95%; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                <h2 style="margin:0; color:var(--text); font-size: 1.2rem;">📄 Valuation Summary</h2>
+                <button onclick="document.getElementById('reportOverlay').classList.remove('active')" style="background:transparent; border:none; color:var(--text); font-size:1.2rem; cursor:pointer;">✕</button>
             </div>
+            
+            <textarea id="finalReportText" style="height: 250px; width: 100%; margin-bottom: 15px; font-family: 'DM Mono', monospace; font-size: 0.85rem; line-height: 1.4; resize: none;" readonly></textarea>
+            
+            <div class="grid-2" style="margin-bottom: 10px;">
+                <button class="btn btn-primary" style="background: var(--surface-2); color: var(--text); border: 1px solid var(--border);" onclick="copyReport()">📋 Copy</button>
+                <button class="btn btn-primary" onclick="shareReport()">📤 Share</button>
+            </div>
+            <button class="btn btn-primary" style="width:100%; background: var(--success);" onclick="document.getElementById('reportOverlay').classList.remove('active'); goHome();">💾 Save to Drafts & Exit</button>
+        </div>
+    </div>
+
+    <!-- ═══ IMPORT OVERLAY ═══ -->
+    <div id="importOverlay" class="login-overlay">
+        <div class="login-card" style="max-width: 500px; width: 95%; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                <h2 style="margin:0; color:var(--text); font-size: 1.2rem;">📥 Paste Raw Report</h2>
+                <button onclick="document.getElementById('importOverlay').classList.remove('active')" style="background:transparent; border:none; color:var(--text); font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            
+            <p style="font-size: 0.8rem; color: var(--text-2); margin-bottom: 10px; text-align: left;">Paste your half-filled or completed text report below. The system will auto-detect the fields.</p>
+            
+            <textarea id="importRawText" style="height: 250px; width: 100%; margin-bottom: 15px; font-family: 'DM Mono', monospace; font-size: 0.85rem; resize: none; background:var(--surface-2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px;" placeholder="Bank Name : State Bank of India&#10;Loan Type   : Home Loan..."></textarea>
+            
+            <button class="btn btn-primary" style="width:100%; background: var(--success);" onclick="processTextImport()">✨ Auto-Fill Form</button>
+        </div>
+    </div>
+
+    <!-- ═══ HEADER ═══ -->
+   <header>
+        <div class="header-left" onclick="goHome()">
+            <div class="logo-mark"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></div>
+            <div><div class="app-title">SIF MODULAR</div><div class="app-subtitle">Field Inspection Pro</div></div>
         </div>
         <div class="header-right">
-            <button class="icon-btn" onclick="openDashboard()" title="History">🗂</button>
-            <button class="icon-btn" onclick="if(typeof fetchInbox==='function') fetchInbox(); G('inboxView').style.display='flex'; G('appContainer').style.display='none';" title="Inbox">📥</button>
-            <button class="icon-btn" onclick="if(typeof logoutAgent==='function') logoutAgent()" title="Logout" style="color:var(--danger);">🚪</button>
+            <button class="icon-btn" onclick="toggleTheme()" id="themeBtn" title="Toggle Theme">☀️</button>
+            <button class="icon-btn" onclick="startNewBlankReport()" title="New Report" style="color:var(--success)">➕</button>
+            <button class="icon-btn" onclick="logoutAgent()" title="Logout" style="color:var(--danger)">🚪</button>
         </div>
     </header>
 
-    <!-- ═══ INBOX VIEW ═══ -->
-    <div id="inboxView" style="display: none; flex-direction: column; padding-bottom: 80px;">
-        <div class="inbox-header">
-            <h2 style="margin:0; font-size: 1.2rem;">📥 Assigned Cases</h2>
-            <div>
-                <button class="btn btn-primary btn-sm" onclick="if(typeof startNewBlankReport==='function') startNewBlankReport()">+ Walk-in Report</button>
-                <button class="refresh-btn" onclick="if(typeof fetchInbox==='function') fetchInbox()">🔄</button>
+    <nav class="bottom-nav" id="bottomNav">
+        
+        <div id="navGlobal" style="display: flex; width: 100%; justify-content: space-around; align-items: center;">
+            <button class="nav-action-btn" onclick="goHome()">
+                <span style="font-size: 1.4rem;">🏠</span>Inbox
+            </button>
+            
+            <button onclick="startNewBlankReport()" style="background: var(--primary); color: white; width: 56px; height: 56px; border-radius: 50%; font-size: 1.8rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(79, 70, 229, 0.4); transform: translateY(-10px);">
+                +
+            </button>
+
+            <button class="nav-action-btn" onclick="openDrafts()">
+                <span style="font-size: 1.4rem;">📂</span>Files
+            </button>
+        </div>
+
+        <div id="navForm" style="display: none; width: 100%; justify-content: space-between; align-items: center;">
+            <button class="nav-action-btn danger" onclick="closeForm()">
+                <span style="font-size: 1.2rem;">✖</span>Close
+            </button>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button class="nav-step-btn" id="prevBtn" onclick="prevStep()" style="background: var(--surface-2); color: var(--text);">◀</button>
+                <div id="stepInd" style="font-size:0.85rem; font-weight:bold; color:var(--text-2); padding:0 5px;">1/11</div>
+                <button class="nav-step-btn" id="nextBtn" onclick="nextStep()" style="background: var(--primary); color: white;">Next ▶</button>
             </div>
         </div>
-        <div id="mailList"></div>
+    </nav>
+    <!-- ═══ INBOX VIEW ═══ -->
+    <div id="inboxView" style="display: none; flex-direction: column; padding: 20px; padding-bottom: 90px;">
+        <div class="inbox-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="margin:0">📥 Inbox</h2>
+            <button class="icon-btn" onclick="if(typeof fetchInbox==='function') fetchInbox()" title="Refresh" style="width:36px; height:36px;">🔄</button>
+        </div>
+        <div id="mailList"><div style="text-align:center; color:var(--text-2); padding: 20px;">Fetching cases in background...</div></div>
+    </div>
+
+    <div id="draftsView" style="display: none; flex-direction: column; padding: 20px; padding-bottom: 90px;">
+        <div class="inbox-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="margin:0">📂 Local Drafts</h2>
+            <div>
+                <button class="btn btn-primary btn-sm" onclick="document.getElementById('importOverlay').classList.add('active')" style="margin-right: 10px;">📥 Import Text</button>
+                <button class="btn btn-warn btn-sm" onclick="clearAllDrafts()" style="color: var(--danger); border-color: rgba(239,68,68,0.3); background: transparent;">🗑 Wipe All</button>
+            </div>
+        </div>
+        <div id="draftList" style="display:flex; flex-direction:column; gap:12px;"></div>
     </div>
 
     <!-- ═══ MAIN APP CONTAINER ═══ -->
-    <div class="wrapper" id="appContainer" style="display:none;">
+    <div class="wrapper" id="appContainer" style="display:none; padding-bottom: 100px;">
         <div class="card">
-            <div class="steps-nav" id="stepsNav"></div>
             <div class="form-body">
 
                 <!-- ═══ STEP 0: BANK & LOAN ═══ -->
@@ -96,19 +161,24 @@
                         <input type="hidden" id="occupiedBy">
                     </div>
                     <div class="field"><label>Site Shown By</label><input type="text" id="siteShownBy" placeholder="Person who showed the site"></div>
-                    <div class="field"><label>Phone Number</label><input type="tel" id="phoneNumber" placeholder="Mobile number"></div>
+                    <div class="field"><label>Phone Number</label><input type="tel" id="phoneNumber" placeholder="Mobile number" oninput="this.value = this.value.replace(/[^0-9+\s()-]/g, '')"></div>
                 </div>
 
                 <!-- ═══ STEP 2: PROPERTY ADDRESS ═══ -->
                 <div class="section" id="s2">
                     <div class="section-head"><h2><span></span>Property Address</h2></div>
                     <div class="field"><label>Property Address</label><textarea id="address" rows="3" placeholder="Full property address"></textarea></div>
+                    <div class="field ac-wrap">
+                        <label>Post Office <small>(Search name or pin)</small></label>
+                        <input type="text" id="postoffice" placeholder="Type to search..." oninput="searchPO(this.value)">
+                        <div class="ac-dd" id="acPostoffice"></div>
+                    </div>
                 </div>
 
                 <!-- ═══ STEP 3: LOCATION & GPS ═══ -->
                 <div class="section" id="s3">
                     <div class="section-head"><h2><span></span>Location & GPS</h2></div>
-                    <div class="field"><label>District</label><input type="text" id="district" value="Kottayam" readonly></div>
+                    <div class="field"><label>District</label><input type="text" id="district" value="Kottayam"></div>
                     <div class="field"><label>Taluk</label><select id="taluk"></select></div>
 
                     <div class="field ac-wrap">
@@ -137,7 +207,7 @@
 
                     <div class="field">
                         <label>GPS Coordinates <button class="btn btn-secondary btn-sm" onclick="getShortAddr()">📍 Auto GPS</button></label>
-                        <input type="text" id="locationCoords" value="GPS NOT LOCKED" readonly>
+                        <input type="text" id="locationCoords" value="GPS NOT LOCKED" oninput="updateMapFromInput()" placeholder="Latitude, Longitude">
                     </div>
                     <div id="mapPreview" style="height: 250px; margin-top: 10px; border-radius: var(--radius-sm); display:none;"></div>
                 </div>
@@ -279,7 +349,50 @@
                         <div class="field"><label>EC Date</label><input type="date" id="ecDate"></div>
                     </div>
                 </div>
+                  <!-- ═══ STEP 9.5: PHOTOS ═══ -->
+                <div class="section" id="s9">
+                    <div class="section-head"><h2><span>10</span> Photo Evidence</h2></div>
+                    
+                    <div class="storage-tracker">
+                        <div class="storage-header">
+                            <span>Local Vault (IndexedDB)</span>
+                            <span id="storageUsage">0 MB / 50 MB</span>
+                        </div>
+                        <div class="storage-bar"><div id="storageFill" class="storage-fill" style="width: 0%"></div></div>
+                    </div>
 
+                    <div class="flex-input">
+                        <select id="photoLabelCapture" style="flex:1;">
+                            <option value="Front Elevation">Front Elevation</option>
+                            <option value="Side View">Side View</option>
+                            <option value="Rear View">Rear View</option>
+                            <option value="Interior">Interior</option>
+                            <option value="Kitchen">Kitchen</option>
+                            <option value="Bathroom">Bathroom</option>
+                            <option value="Living Room">Living Room</option>
+                            <option value="Dining Room">Dining Room</option>
+                            <option value="Bedroom">Bedroom</option>
+                            <option value="Balcony">Balcony</option>
+                            <option value="Staircase">Staircase</option>
+                            <option value="Roof">Roof</option>
+                            <option value="Basement">Basement</option>
+                            <option value="Garden">Garden</option>
+                            <option value="Parking">Parking</option>
+                            <option value="First Floor">First Floor</option>
+                            <option value="Second Floor">Second Floor</option>
+                            <option value="Third Floor">Third Floor</option>
+                            <option value="Basement">Basement</option>
+                            <option value="Cellar">Cellar</option>
+                            <option value="Other">Other</option>
+                            <option value="Road Access">Road Access</option>
+                            <option value="Boundaries">Boundaries</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="document.getElementById('photoInput').click()">📷 Capture</button>
+                    </div>
+                    <input type="file" id="photoInput" accept="image/*" capture="environment" onchange="handleCapture(this)" style="display:none">
+                    
+                    <div id="photoGalleryCapture" class="photo-grid"></div>
+                </div>
                 <!-- ═══ STEP 10: ROUTE & REMARKS ═══ -->
                 <div class="section" id="s10">
                     <div class="section-head"><h2><span></span>Route & Remarks</h2></div>
@@ -304,7 +417,7 @@
                 <div class="section" id="s11">
                     <div class="section-head">
                         <h2><span></span>Report & Submit</h2>
-                        <button class="btn btn-secondary btn-sm" onclick="generateReport()">📄 Generate</button>
+                        <button class="btn btn-secondary btn-sm" onclick="showFinalReport()">📄 Generate</button>
                     </div>
 
                     <!-- Photo Section -->
@@ -347,18 +460,6 @@
 
             </div><!-- /form-body -->
 
-            <!-- Footer Navigation -->
-            <div class="step-footer">
-                <button class="btn btn-secondary" id="prevBtn" onclick="prevStep()" style="visibility: hidden;">◀ Back</button>
-                <div class="step-counter">
-                    <span id="stepInd">1 / 12</span>
-                    <div class="bar"><div class="bar-fill" id="progressBar"></div></div>
-                </div>
-                <button class="btn btn-primary" id="nextBtn" onclick="nextStep()">Next ▶</button>
-            </div>
-        </div><!-- /card -->
-    </div><!-- /wrapper -->
-
     <!-- ═══ PHOTO LIGHTBOX ═══ -->
     <div id="photoLightbox" class="lightbox-overlay">
         <div class="lightbox-content">
@@ -396,15 +497,27 @@
         </div>
         <div class="dash-body" id="dashBody"></div>
     </div>
-
+    
+<div id="lightbox" class="lb-overlay">
+        <div class="lb-header">
+            <div class="lb-title" id="lbTitle">Photo View</div>
+            <button class="lb-close" onclick="closeLightbox()">✕</button>
+        </div>
+        <div class="lb-image-container"><img id="lbImage" src=""></div>
+        <div class="lb-toolbar">
+            <button class="lb-btn share" onclick="shareCurrentPhoto()">📤 Share</button>
+            <button class="lb-btn retake" onclick="retakeCurrentPhoto()">🔄 Retake</button>
+            <button class="lb-btn delete" onclick="deleteCurrentPhoto()">🗑 Delete</button>
+        </div>
+    </div>
     <!-- ═══ TOAST ═══ -->
     <div class="toast" id="toast"></div>
 
-<script src="data.js"></script>
-<script src="api.js"></script>
-<script src="location.js"></script>
-<script src="photoEngine.js"></script>
-<script src="ui.js"></script>
-<script src="app.js"></script>       
+<script src="js/data.js"></script>
+<script src="js/api.js"></script>
+<script src="js/location.js"></script>
+<script src="js/photoEngine.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>       
 </body>
 </html>
