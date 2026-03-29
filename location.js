@@ -199,9 +199,21 @@ function placeMarker(lat, lng) {
 }
 
 function updateMapFromInput() {
-    const coords = V('locationCoords').split(',');
-    if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-        placeMarker(parseFloat(coords[0]), parseFloat(coords[1]));
+    const rawValue = V('locationCoords');
+    if (!rawValue || rawValue === 'GPS NOT LOCKED') return;
+
+    const parts = rawValue.split(',');
+    if (parts.length === 2) {
+        const lat = parseFloat(parts[0].trim());
+        const lng = parseFloat(parts[1].trim());
+
+        if (!isNaN(lat) && !isNaN(lng)) {
+            initMap().then(() => {
+                placeMarker(lat, lng);
+                G('mapPreview').style.display = 'block';
+            });
+            if (typeof saveDraft === 'function') saveDraft();
+        }
     }
 }
 
@@ -238,9 +250,16 @@ function getShortAddr() {
             }
         } catch (e) { }
     }, () => {
-        toast('❌ Permission denied'); btn.innerHTML = '📍 Auto GPS'; btn.disabled = false;
+        toast('❌ GPS Failed. Please enter coordinates manually.', 6000);
+        const coords = G('locationCoords');
+        if (coords) {
+            coords.focus();
+            coords.placeholder = 'Lat, Lng e.g. 9.5916, 76.5222';
+            if (coords.value === 'GPS NOT LOCKED') coords.value = '';
+        }
+        btn.innerHTML = '📍 Auto GPS'; btn.disabled = false;
     },
-        { enableHighAccuracy: true, maximumAge: 0 });
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
 }
 
 // ── 5. DISTANCE & ROUTE GENERATORS (Overpass & OSRM) ───────────────────────
