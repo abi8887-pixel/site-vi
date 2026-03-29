@@ -4,15 +4,19 @@
 async function loginAgent(id, pass) {
     const url = localStorage.getItem('sif_url');
     
+    if (!url) {
+        console.error("❌ No API URL configured. Check localStorage.sif_url");
+        toast('❌ API URL not configured');
+        return false;
+    }
+    
     try {
-        // 🚩 FIX 3: Using 'post' with 'no-cors' or ensuring the script returns JSONP/CORS headers
-        // For Google Apps Script, we usually send a POST request
         const response = await fetch(url, {
             method: 'POST',
-            mode: 'cors', // GitHub requires cors for secure fetch
+            mode: 'cors',
             cache: 'no-cache',
             headers: {
-                'Content-Type': 'text/plain;charset=utf-8', // Avoids pre-flight OPTIONS check
+                'Content-Type': 'application/json;charset=utf-8', // ← FIXED
             },
             body: JSON.stringify({
                 action: 'login',
@@ -21,11 +25,15 @@ async function loginAgent(id, pass) {
             })
         });
 
+        if (!response.ok) {
+            console.error(`API Error: ${response.status} ${response.statusText}`);
+            throw new Error(`HTTP ${response.status}`);
+        }
+
         const result = await response.json();
         return result.status === 'success';
     } catch (err) {
-        // 🚩 FIX 4: Local Bypass for Testing
-        // If your script isn't live yet, you can bypass this to see the UI on Git
+        console.error("Login Error:", err.message);
         console.warn("API Offline, using local bypass for UI testing");
         return id === "admin" && pass === "123"; 
     }
