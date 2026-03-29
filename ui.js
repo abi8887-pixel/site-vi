@@ -5,7 +5,7 @@
 let currentStep = 0;
 const totalSteps = 12;
 const STEP_LABELS = ['Bank', 'People', 'Address', 'Location', 'Distances', 'Road', 'Boundaries', 'Building', 'Land', 'Documents', 'Route', 'Report'];
-
+s
 // --- STEP NAVIGATION ---
 function buildNav() {
     const nav = G('stepsNav');
