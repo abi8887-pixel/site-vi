@@ -3,6 +3,18 @@
 // Initializes the app, handles event listeners, auto-saving, and network status
 // ═══════════════════════════════════════════════════════════════════════════════
 // Global State
+// ── GLOBAL UTILITIES (CRITICAL FOR GIT) ──
+// These must be defined first to avoid "ReferenceError: G is not defined"
+const G = (id) => document.getElementById(id);
+const V = (id) => G(id) ? G(id).value : '';
+
+// Now your handleLogin can proceed safely
+async function handleLogin() {
+    const id = V('loginId');
+    const pass = V('loginPass');
+    const url = V('loginUrl');
+    // ... rest of your code
+}
 let currentAssignedCaseId = null;
 
 
