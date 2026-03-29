@@ -5,26 +5,8 @@
 // Global State
 let currentAssignedCaseId = null;
 
-// Utility for selecting elements
-const G = (id) => document.getElementById(id);
-const V = (id) => G(id) ? (G(id).value || '') : '';
 
-// --- NAVIGATION ROUTING ---
-function goHome() {
-    G('appContainer').style.display = 'none';
-    G('inboxView').style.display = 'flex';
-    G('loginOverlay').classList.remove('active');
-    
-    if (typeof fetchInbox === 'function') fetchInbox();
-}
 
-function startNewBlankReport() {
-    currentAssignedCaseId = null;
-    G('inboxView').style.display = 'none';
-    G('appContainer').style.display = 'block';
-    
-    if (typeof resetApp === 'function') resetApp();
-}
 
 function logoutAgent() {
     localStorage.removeItem('sif_session_token');
@@ -153,7 +135,7 @@ function collectFormData() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // GENERATE REPORT — Produces the exact text format requested
 // ═══════════════════════════════════════════════════════════════════════════════
-function generateReport() {
+function showFinalReport() {
     const d = collectFormData();
 
     const report = `Bank Name : ${d.bankName}
@@ -209,7 +191,7 @@ WEST     :  ${d.actWest}
 
 Demarcation : ${d.demarcationNote}
 NORTH  : ${d.demNorth}
-SOUTH  : ${d.demSouth}
+SOUTH  :  ${d.demSouth}
 EAST      : ${d.demEast}
 WEST     : ${d.demWest}
 
@@ -245,30 +227,110 @@ Report sent : ${d.reportSent}
 Report sent to : ${d.reportSentTo}
 `;
 
+    const reportText = report;
+    
+    const textOutput = document.getElementById('finalReportText');
+    if (textOutput) textOutput.value = reportText;
+    
+    const overlay = document.getElementById('reportOverlay');
+    if (overlay) overlay.classList.add('active');
+    
+    // Support legacy element if still in DOM
     const output = G('reportOutput');
     if (output) {
-        output.value = report;
-        toast('📄 Report generated!');
+        output.value = reportText;
     }
-    return report;
+    return reportText;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SAVE DRAFT — Persists form state to localStorage for crash recovery
+// Called by location.js (village autocomplete, GPS, distances, route, post office)
+// ═══════════════════════════════════════════════════════════════════════════════
+function saveDraft() {
+    try {
+        const data = collectFormData();
+        localStorage.setItem('sif_draft', JSON.stringify(data));
+    } catch (e) {
+        console.warn('Draft save failed:', e);
+    }
+}
+
+function loadDraft() {
+    try {
+        const raw = localStorage.getItem('sif_draft');
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        
+        // Restore simple text/select fields
+        const fieldMap = {
+            bankName: 'bankName', applicantName: 'applicantName', ownerName: 'ownerName',
+            siteShownBy: 'siteShownBy', phoneNumber: 'phoneNumber', address: 'address',
+            district: 'district', taluk: 'taluk', locality: 'locality', ward: 'ward',
+            doorNo: 'doorNo', locationCoords: 'locationCoords',
+            nearLandmark: 'nearLandmark', nearBranch: 'nearBranch', distFromOffice: 'distFromOffice',
+            nearPolice: 'nearPolice', nearRailway: 'nearRailway', nearBus: 'nearBus',
+            nearTown: 'nearTown', nearHospital: 'nearHospital',
+            accessToSite: 'accessToSite', distFromRoad: 'distFromRoad', conditionOfRoad: 'conditionOfRoad',
+            lsNorth: 'lsNorth', lsSouth: 'lsSouth', lsEast: 'lsEast', lsWest: 'lsWest',
+            actNorth: 'actNorth', actSouth: 'actSouth', actEast: 'actEast', actWest: 'actWest',
+            demarcationNote: 'demarcationNote', demNorth: 'demNorth', demSouth: 'demSouth', demEast: 'demEast', demWest: 'demWest',
+            buildingAge: 'buildingAge', areaOfBuilding: 'areaOfBuilding', numFloors: 'numFloors',
+            flooring: 'flooring', waterSource: 'waterSource',
+            landPrice: 'landPrice', extent: 'extent', syNo: 'syNo',
+            deedNo: 'deedNo', deedSRO: 'deedSRO', lsNo: 'lsNo', ltrNo: 'ltrNo',
+            possessionNo: 'possessionNo', btrNo: 'btrNo', ecNo: 'ecNo',
+            remarks: 'remarks', reportSentTo: 'reportSentTo'
+        };
+        
+        Object.entries(fieldMap).forEach(([key, id]) => {
+            if (d[key] && G(id)) G(id).value = d[key];
+        });
+        
+        // Restore autocomplete text inputs
+        if (d.village && G('villageInput')) G('villageInput').value = d.village;
+        if (d.panchayat && G('panchayatInput')) G('panchayatInput').value = d.panchayat;
+        if (d.municipality && G('municipalityInput')) G('municipalityInput').value = d.municipality;
+        if (d.routeText && G('routeText')) G('routeText').value = d.routeText;
+        
+        toast('📂 Draft restored', 2000);
+    } catch (e) {
+        console.warn('Draft load failed:', e);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COPY REPORT TO CLIPBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-function copyReport() {
-    const output = G('reportOutput');
-    if (!output || !output.value) {
-        generateReport();
-    }
-    navigator.clipboard.writeText(G('reportOutput').value).then(() => {
-        toast('📋 Report copied to clipboard!');
-    }).catch(() => {
+async function copyReport() {
+    const text = document.getElementById('finalReportText').value;
+    try {
+        await navigator.clipboard.writeText(text);
+        toast("📋 Copied to Clipboard!");
+    } catch (err) {
         // Fallback
-        G('reportOutput').select();
+        document.getElementById('finalReportText').select();
         document.execCommand('copy');
-        toast('📋 Copied!');
-    });
+        toast("📋 Copied to Clipboard!");
+    }
+}
+
+async function shareReport() {
+    const text = document.getElementById('finalReportText').value;
+    const applicant = document.getElementById('applicantName')?.value || 'Client';
+    
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: `Valuation: ${applicant}`,
+                text: text
+            });
+        } catch (err) {
+            console.log("Share cancelled or failed");
+        }
+    } else {
+        toast("⚠️ Web Share not supported, please copy.");
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -291,12 +353,17 @@ window.addEventListener('load', () => {
     if (savedUrl && G('loginUrl')) G('loginUrl').value = savedUrl;
     if (savedUrl && G('gasUrl')) G('gasUrl').value = savedUrl;
 
+    // Force bottom nav to show correctly on boot
+    const bottomNav = document.getElementById('bottomNav');
+    if (bottomNav) bottomNav.style.display = token ? 'flex' : 'none';
+
     if (!token) {
         G('loginOverlay').classList.add('active');
         G('inboxView').style.display = 'none';
         G('appContainer').style.display = 'none';
     } else {
-        goHome();
+        // Instantly load the Home UI (No awaiting!)
+        if(typeof goHome === 'function') goHome();
     }
 
     // Hydrate form data and build navigation
