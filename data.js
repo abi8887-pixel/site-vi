@@ -6,17 +6,19 @@
 
 const SIF_DATA = {
     BANKS: [
-        "ICICI Bank", "HDFC Bank", "State Bank of India", 
-        "Axis Bank", "Federal Bank", "Canara Bank", 
-        "South Indian Bank", "Kerala Bank", "IDBI Bank"
+        "ICICI Bank", "HDFC Bank", "Cholamandalam","Credila","Karur Vysya Bank",
+        "Axis Bank","Muthot Home Finance", "DCB Bank","Yes Bank",
+        "South Indian Bank", "ESAF Small Finance Bank", "IDFC First Bank"
     ],
-    
-    LOAN_TYPES: ["Home Loan", "LAP", "Construction", "Purchase", "Renovation"],
-    
-    OCCUPANCY: ["Owner", "Tenant", "Vacant", "Shared"],
-    
-    ROOFING: ["RCC", "Sheet", "Tile", "Thatch"],
-    
+
+    LOAN_TYPES: ["Home Loan", "LAP", "Construction", "Purchase", "Renovation", "takeover", "PD", "LARP", "Revaluation"],
+
+    OCCUPANCY: ["Owner", "Tenant", "Vacant", "Shared", "Under Construction", "Under Bank Possession"],
+
+    ROOFING: ["RCC", "Asbestos Sheet", "GI Sheet", "MP Tiles", "Ceramic Tiles", "Thatch"],
+
+    FLOORING: ["Vitrified Tiles", "Ceramic Tiles", "Marble", "Granite", "Wood", "Concrete", "Other"],
+
     LAND_USAGE: ["Residential", "Commercial", "Agricultural", "Industrial", "Mixed"]
 }
 // Location dictionaries (VD, PD, MD) and autocomplete engines are in location.js
