@@ -1,6 +1,35 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // UI & MULTI-DRAFT ENGINE
 // ═══════════════════════════════════════════════════════════════════════════════
+async function loginAgent(id, pass) {
+    const url = localStorage.getItem('sif_url');
+    
+    try {
+        // 🚩 FIX 3: Using 'post' with 'no-cors' or ensuring the script returns JSONP/CORS headers
+        // For Google Apps Script, we usually send a POST request
+        const response = await fetch(url, {
+            method: 'POST',
+            mode: 'cors', // GitHub requires cors for secure fetch
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8', // Avoids pre-flight OPTIONS check
+            },
+            body: JSON.stringify({
+                action: 'login',
+                agentId: id,
+                password: pass
+            })
+        });
+
+        const result = await response.json();
+        return result.status === 'success';
+    } catch (err) {
+        // 🚩 FIX 4: Local Bypass for Testing
+        // If your script isn't live yet, you can bypass this to see the UI on Git
+        console.warn("API Offline, using local bypass for UI testing");
+        return id === "admin" && pass === "123"; 
+    }
+}
 
 let currentStep = 0;
 const totalSteps = 12; // 12 total steps (s0..s11)
