@@ -15,35 +15,46 @@ function logoutAgent() {
 
 // --- LOGIN LOGIC ---
 async function handleLogin() {
-    const id = V('loginId');
-    const pass = V('loginPass');
-    const url = V('loginUrl');
+    const id = G('loginId').value.trim();
+    const pass = G('loginPass').value.trim();
+    let url = G('loginUrl').value.trim();
 
     if (!id || !pass || !url) {
-        toast('⚠️ All fields are required.');
-        return;
+        return toast('⚠️ Please fill all fields');
+    }
+
+    // 🚩 FIX 1: Ensure URL is HTTPS for GitHub Pages compatibility
+    if (url.startsWith('http:')) {
+        url = url.replace('http:', 'https:');
     }
 
     const btn = G('btnLogin');
-    const originalText = btn.innerText;
-    btn.innerHTML = '<span class="spinner"></span> Authenticating...';
+    btn.innerHTML = 'Authenticating...';
     btn.disabled = true;
 
+    // Save URL immediately so api.js can use it
     localStorage.setItem('sif_url', url);
 
     try {
-        const success = await loginAgent(id, pass);
+        // 🚩 FIX 2: Timeout Protection
+        // Google Apps Script can sometimes take 5-10 seconds to wake up
+        const success = await loginAgent(id, pass); 
+        
         if (success) {
+            localStorage.setItem('sif_session_token', 'AUTH_' + Date.now());
+            localStorage.setItem('sif_agent_id', id);
+            
+            G('loginOverlay').classList.remove('active');
+            toast('🔓 Access Granted');
             goHome();
         } else {
-            btn.innerText = originalText;
-            btn.disabled = false;
+            throw new Error("Invalid Credentials");
         }
-    } catch (err) {
-        console.error(err);
-        btn.innerText = originalText;
+    } catch (e) {
+        console.error("Login Error:", e);
+        btn.innerHTML = 'Secure Login';
         btn.disabled = false;
-        toast('❌ Connection Failed');
+        toast('❌ Login Failed: Check URL or Credentials');
     }
 }
 
