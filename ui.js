@@ -398,6 +398,10 @@ function buildNav() {
     updateUI();
 }
 
+function setupLightboxTouch() {
+    // Stub for touch interactions
+}
+
 // --- BOOTSTRAP ---
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
@@ -555,7 +559,8 @@ function processTextImport() {
 
     // 5. Visually Update Chips
     ['loanType', 'occupiedBy', 'nearbyLandUsage', 'roofing'].forEach(id => {
-        const val = G(id)?.value;
+        const elId = G(id);
+        const val = elId ? elId.value : null;
         if (val) {
             let containerId = id + 'Container';
             if (id === 'occupiedBy') containerId = 'occupancyContainer';
